@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { adminPassword, adminToken } from "../lib/admin-auth.js";
+import { getLegacyConfig, getLegacyProducts, getLegacyStatuses } from "../lib/legacy-config.js";
 
 export const adminRouter = Router();
 
@@ -58,11 +59,17 @@ adminRouter.get("/config", requireAdmin, async (_req: Request, res: Response) =>
       promptSource = "file";
     }
 
-    // Read from products table for catalog
-    const { data: products } = await supabase
-      .from("products")
-      .select("*")
-      .order("name");
+    let products: any[] = [];
+    try {
+      const { data } = await supabase
+        .from("products")
+        .select("*")
+        .order("name");
+      products = data || [];
+    } catch {}
+
+    const legacyConfig = getLegacyConfig();
+    const legacyStatuses = getLegacyStatuses();
 
     res.json({
       systemPrompt,
@@ -70,10 +77,16 @@ adminRouter.get("/config", requireAdmin, async (_req: Request, res: Response) =>
       apiKeys: (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean).map(() => "***"),
       _apiKeyCount: (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean).length,
       models: (process.env.GEMINI_MODELS || "gemini-2.5-flash").split(",").filter(Boolean),
-      facebookPixelIds: [process.env.FACEBOOK_PIXEL_ID].filter(Boolean),
-      googleAnalyticsIds: [process.env.GA4_ID].filter(Boolean),
-      products: products || [],
-      statuses: [
+      catalogItemTemplate: legacyConfig.catalogItemTemplate || "{n}. {name} [RENDER_PRODUCT:{id}] : {benefits} Composition : {composition} Prix : {price} {currency}.",
+      welcomeMessage: process.env.WELCOME_MESSAGE || legacyConfig.welcomeMessage || "",
+      facebookPixelIds: [process.env.FACEBOOK_PIXEL_ID].filter(Boolean).length
+        ? [process.env.FACEBOOK_PIXEL_ID].filter(Boolean)
+        : (legacyConfig.facebookPixelIds || []),
+      googleAnalyticsIds: [process.env.GA4_ID].filter(Boolean).length
+        ? [process.env.GA4_ID].filter(Boolean)
+        : (legacyConfig.googleAnalyticsIds || []),
+      products: products.length ? products : getLegacyProducts(),
+      statuses: legacyStatuses.length ? legacyStatuses : [
         "attente de confirm tel",
         "cde double",
         "a expedier",

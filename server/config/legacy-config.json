@@ -1,0 +1,110 @@
+﻿{
+  "catalogItemTemplate": "{n}. {name} [RENDER_PRODUCT:{id}] : {benefits} Composition : {composition}{taille} Taille : {taille}.{/taille} Prix : {price} {currency}.",
+  "welcomeMessage": "<iframe src=\"https://www.facebook.com/plugins/video.php?height=315&href=https%3A%2F%2Fwww.facebook.com%2Freel%2F4279097132303066%2F&show_text=false&width=560&t=0\" width=\"560\" height=\"315\" style=\"border:none;overflow:hidden\" scrolling=\"no\" frameborder=\"0\" allowfullscreen=\"true\" allow=\"autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share\" allowFullScreen=\"true\"></iframe>\n<p>Marhba bik 🙏 Je suis Amine, et ici <strong>on ne vend pas des accessoires</strong>. On crée des <strong>outils vibratoires</strong> — du quartz, du cuivre, des cristaux — programmés avec une intention précise pour <strong>protéger ton énergie</strong>, repousser le négatif et aligner ce que tu veux vraiment attirer dans ta vie.</p>\n\n<p>Beaucoup arrivent ici après avoir <em>tout essayé sans résultat</em>. Ce n'est pas un hasard si tu es là aujourd'hui.</p>\n\n<p><strong>Dis-moi, c'est quoi le premier truc que tu voudrais transformer dans ton quotidien ? 🙏</strong></p>",
+  "facebookPixelIds": [
+    "631385398982484"
+  ],
+  "googleAnalyticsIds": [
+    "G-SFXXQ54ZFS"
+  ],
+  "statuses": [
+    "attente de confirm tel",
+    "cde double",
+    "à expedier",
+    "injoignable",
+    "confirmée att. env.",
+    "livrée",
+    "échouée",
+    "nn qualifiée",
+    "Annulee"
+  ],
+  "products": [
+    {
+      "id": "coeur_vert_protection",
+      "name": "Collier Cœur Vert Royale™",
+      "price": 49,
+      "currency": "DT",
+      "imageUrl": "https://orgonite-tunisie.com/wp-content/uploads/2026/04/17753389517d0f.webp",
+      "benefits": "Bouclier vibratoire nomade qui repousse les énergies lourdes du quotidien, réduit la fatigue accumulée et stimule la vitalité naturelle. Associé à la Malachite (protection, absorption), l'Aventurine Verte (équilibre émotionnel, sérénité) et la Serpentine (circulation de l'énergie vitale, renouveau).",
+      "composition": "Résine organique, spirale en cuivre, feuilles d'or, fragments de cuivre, chaîne en acier inoxydable.",
+      "taille": "3.5 cm"
+    },
+    {
+      "id": "coeur_amethyste",
+      "name": "Collier Cœur Améthyste Royale™",
+      "price": 49,
+      "currency": "DT",
+      "imageUrl": "https://orgonite-tunisie.com/wp-content/uploads/2026/03/Nano_Banana_2_Luxury_product_photography_of_a_heart_shaped_orgonite_resin_pendant_centered_on_a_deep.webp",
+      "benefits": "Apporte clarté mentale, sérénité et équilibre émotionnel. Idéal pour les environnements stressants. Composé d'Améthyste (clarté mentale, protection), Fluorite Violette (équilibre émotionnel, stabilité) et Quartz Cristal (amplification, vitalité).",
+      "composition": "Résine organique, spirale en cuivre, feuilles d'or, fragments de cuivre, chaîne en acier inoxydable.",
+      "taille": "3.5 cm"
+    },
+    {
+      "id": "coeur_rose_amour",
+      "name": "Collier Cœur Rose Royale™",
+      "price": 49,
+      "currency": "DT",
+      "imageUrl": "https://orgonite-tunisie.com/wp-content/uploads/2026/05/ChatGPT-Image-May-5-2026-09_06_24-AM.webp",
+      "benefits": "Programmable avec votre intention pour attirer l'amour, protéger votre relation et renforcer l'énergie du cœur. Contient du Quartz Rose naturel (amour, ouverture du cœur, guérison émotionnelle).",
+      "composition": "Résine organique, spirale en cuivre, feuilles d'or, fragments de cuivre, chaîne en acier inoxydable, Quartz Rose.",
+      "taille": "3.5 cm"
+    },
+    {
+      "id": "cone_voiture",
+      "name": "Cône Orgonite pour Voiture",
+      "price": 59,
+      "currency": "DT",
+      "imageUrl": "https://orgonite-tunisie.com/wp-content/uploads/2026/02/Gemini_Generated_Image_n086oon086oon086.webp",
+      "benefits": "Protège votre véhicule du mauvais œil et des énergies négatives. Apporte sérénité au volant et neutralise les tensions nerveuses liées aux trajets. Fabriqué avec du quartz naturel de Madagascar. S'accroche au rétroviseur.",
+      "composition": "Résine, quartz naturel, copeaux de métaux, cordon de fixation.",
+      "taille": "3 cm"
+    },
+    {
+      "id": "dome_abondance",
+      "name": "Dôme Orgonite Abondance",
+      "price": 70,
+      "currency": "DT",
+      "imageUrl": "https://orgonite-tunisie.com/wp-content/uploads/2026/03/Gemini_Generated_Image_kyptohkyptohkypt.webp",
+      "benefits": "Purifie l'énergie de votre espace et attire naturellement l'abondance. Transforme les énergies stagnantes en énergie positive. Composé de Turquoise (prospérité, ouverture des portes), Rhodonite (abondance, confiance) et Cristal de Quartz (purification).",
+      "composition": "Résine naturelle, copeaux de cuivre, turquoise, rhodonite, cristal de quartz.",
+      "taille": "9 cm"
+    },
+    {
+      "id": "orgonite_anti_ondes",
+      "name": "Orgonite Anti-Ondes (Dôme 9cm)",
+      "price": 80,
+      "currency": "DT",
+      "imageUrl": "https://orgonite-tunisie.com/wp-content/uploads/2026/03/1773221638771b.webp",
+      "benefits": "Protège des ondes électromagnétiques (WiFi, 4G/5G, antennes). Améliore le sommeil, réduit le stress et les maux de tête. Testé avec détecteur EMF. 9 couches d'ingénierie énergétique avec améthyste, tourmaline noire et quartz.",
+      "composition": "Résine, spirale cuivre 2mm, matrice métal (cuivre & alu), triangle cuivre bio-géométrie, cristal quartz 3cm, améthyste, tourmaline noire, graphite, dôme époxy 9cm."
+    },
+    {
+      "id": "orgonite_islamique",
+      "name": "Orgonite Islamique Personnalisé",
+      "price": 80,
+      "currency": "DT",
+      "imageUrl": "https://orgonite-tunisie.com/wp-content/uploads/2026/03/177478574547d8.webp",
+      "benefits": "Allie la technologie de l'orgone aux versets coraniques, Du'ā et Wird pour une protection spirituelle profonde et la Baraka. Disponible en 17 intentions : Rizq, commerce, guérison, mariage, protection, mauvais œil, etc. Fabriqué sur commande selon votre intention.",
+      "composition": "Résine, métaux, cristaux naturels, versets sacrés intégrés selon l'intention choisie."
+    },
+    {
+      "id": "orgonedisc_recharge",
+      "name": "OrgonDisc Fleur de Vie",
+      "price": 50,
+      "currency": "DT",
+      "imageUrl": "https://orgonite-tunisie.com/wp-content/uploads/2026/04/17754938878cdc.webp",
+      "benefits": "Recharge et purifie tous vos bracelets en cristaux pendant votre sommeil. Compatible avec toutes les pierres (améthyste, labradorite, citrine, quartz rose, etc.). Intègre la Fleur de Vie pour une programmation d'intention vibratoire. Peut aussi dynamiser l'eau.",
+      "composition": "Résine époxy transparente, copeaux de cuivre, poudre d'aluminium, quartz cristal, tourmaline noire, améthyste, spirale cuivre double hélice, Fleur de Vie imprimée haute résolution. ⌀ 12cm."
+    },
+    {
+      "id": "orgonite_perso",
+      "name": "Orgonite Personnalisée",
+      "price": 76,
+      "currency": "DT",
+      "imageUrl": "https://orgonite-tunisie.com/wp-content/uploads/2026/05/perso.webp",
+      "benefits": "Composée sur mesure selon votre profil astrologique et numérologique. Analyse vibratoire personnalisée + feuille de profil + activation guidée. Prix selon format : 76 DT collier, 79 DT cône voiture, 89 DT dôme.",
+      "composition": "Composition unique basée sur votre profil (signe, chemin de vie, nombre d'âme, nombre de personnalité). Résine, cristaux et métaux sélectionnés spécialement pour vous."
+    }
+  ]
+}
+

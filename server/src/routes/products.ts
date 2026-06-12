@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { getLegacyProducts } from "../lib/legacy-config.js";
 
 export const productsRouter = Router();
 
@@ -22,9 +23,11 @@ productsRouter.get("/", async (_req: Request, res: Response) => {
 
     if (error) return res.status(500).json({ error: error.message });
 
-    res.json(
-      (data || []).map(formatProduct)
-    );
+    const rows = data?.length
+      ? data
+      : getLegacyProducts().filter((p: any) => isAdminMount || p.visible !== false);
+
+    res.json(rows.map(formatProduct));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -39,7 +42,8 @@ productsRouter.get("/admin", requireAdmin, async (_req: Request, res: Response) 
       .order("created_at", { ascending: false });
 
     if (error) return res.status(500).json({ error: error.message });
-    res.json((data || []).map(formatProduct));
+    const rows = data?.length ? data : getLegacyProducts();
+    res.json(rows.map(formatProduct));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -161,7 +165,7 @@ productsRouter.delete("/:id", requireAdmin, async (req: Request, res: Response) 
 // Admin: sync products from config
 productsRouter.post("/sync", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { products: configProducts } = req.body;
+    const configProducts = req.body?.products?.length ? req.body.products : getLegacyProducts();
     if (!configProducts?.length) {
       return res.status(400).json({ error: "Aucun produit a synchroniser" });
     }
@@ -221,27 +225,29 @@ function formatProduct(row: any) {
     slug: row.slug,
     price: parseFloat(row.price) || 0,
     currency: row.currency || "DT",
-    imageUrl: row.image_url || "",
+    imageUrl: row.image_url || row.imageUrl || "",
     benefits: row.benefits || "",
+    composition: row.composition || "",
     taille: row.taille || "",
-    accentColor: row.accent_color || "#7c3aed",
-    productType: row.product_type || "",
-    welcomeSequence: safeJsonParse(row.welcome_sequence, []),
+    accentColor: row.accent_color || row.accentColor || "#7c3aed",
+    productType: row.product_type || row.productType || "",
+    welcomeSequence: safeJsonParse(row.welcome_sequence ?? row.welcomeSequence, []),
     stock: parseInt(row.stock) || 0,
     hook: row.hook || "",
     hookTransition: row.hook_transition || "",
-    upsellPrice: row.upsell_price ? parseFloat(row.upsell_price) : null,
-    priceOriginal: row.price_original ? parseFloat(row.price_original) : null,
+    upsellPrice: row.upsell_price || row.upsellPrice ? parseFloat(row.upsell_price ?? row.upsellPrice) : null,
+    priceOriginal: row.price_original || row.priceOriginal ? parseFloat(row.price_original ?? row.priceOriginal) : null,
     faq: safeJsonParse(row.faq, []),
     reviews: safeJsonParse(row.reviews, []),
-    visible: row.visible,
+    visible: row.visible !== false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-function safeJsonParse(val: string | null, fallback: unknown) {
+function safeJsonParse(val: unknown, fallback: unknown) {
   if (!val) return fallback;
+  if (typeof val !== "string") return val;
   try {
     return JSON.parse(val);
   } catch {

@@ -4,6 +4,7 @@ exports.servicesRouter = void 0;
 const express_1 = require("express");
 const supabase_js_1 = require("../lib/supabase.js");
 const auth_js_1 = require("../middleware/auth.js");
+const legacy_config_js_1 = require("../lib/legacy-config.js");
 exports.servicesRouter = (0, express_1.Router)();
 // Public: list visible services
 exports.servicesRouter.get("/", async (_req, res) => {
@@ -20,7 +21,10 @@ exports.servicesRouter.get("/", async (_req, res) => {
         });
         if (error)
             return res.status(500).json({ error: error.message });
-        res.json((data || []).map(formatService));
+        const rows = data?.length
+            ? data
+            : (0, legacy_config_js_1.getLegacyServices)().filter((s) => isAdminMount || s.visible !== false);
+        res.json(rows.map(formatService));
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -35,7 +39,8 @@ exports.servicesRouter.get("/admin", auth_js_1.requireAdmin, async (_req, res) =
             .order("created_at", { ascending: false });
         if (error)
             return res.status(500).json({ error: error.message });
-        res.json((data || []).map(formatService));
+        const rows = data?.length ? data : (0, legacy_config_js_1.getLegacyServices)();
+        res.json(rows.map(formatService));
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -167,16 +172,16 @@ function formatService(row) {
         slug: row.slug,
         subtitle: row.subtitle || "",
         price: parseFloat(row.price) || 0,
-        originalPrice: row.original_price ? parseFloat(row.original_price) : null,
+        originalPrice: row.original_price || row.originalPrice ? parseFloat(row.original_price ?? row.originalPrice) : null,
         icon: row.icon || "🔮",
-        imageUrl: row.image_url || "",
+        imageUrl: row.image_url || row.imageUrl || "",
         color: row.color || "#8b5cf6",
         description: row.description || "",
         benefits: row.benefits || "",
         duration: row.duration || "",
         format: row.format || "",
-        productIds: (row.service_products || []).map((sp) => sp.product_id),
-        visible: row.visible,
+        productIds: row.productIds || (row.service_products || []).map((sp) => sp.product_id),
+        visible: row.visible !== false,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };

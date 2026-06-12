@@ -38,6 +38,7 @@ const express_1 = require("express");
 const supabase_js_1 = require("../lib/supabase.js");
 const auth_js_1 = require("../middleware/auth.js");
 const admin_auth_js_1 = require("../lib/admin-auth.js");
+const legacy_config_js_1 = require("../lib/legacy-config.js");
 exports.adminRouter = (0, express_1.Router)();
 exports.adminRouter.post("/login", async (req, res) => {
     try {
@@ -84,21 +85,33 @@ exports.adminRouter.get("/config", auth_js_1.requireAdmin, async (_req, res) => 
             systemPrompt = fs.readFileSync(promptFile, "utf-8");
             promptSource = "file";
         }
-        // Read from products table for catalog
-        const { data: products } = await supabase_js_1.supabase
-            .from("products")
-            .select("*")
-            .order("name");
+        let products = [];
+        try {
+            const { data } = await supabase_js_1.supabase
+                .from("products")
+                .select("*")
+                .order("name");
+            products = data || [];
+        }
+        catch { }
+        const legacyConfig = (0, legacy_config_js_1.getLegacyConfig)();
+        const legacyStatuses = (0, legacy_config_js_1.getLegacyStatuses)();
         res.json({
             systemPrompt,
             _promptSource: promptSource,
             apiKeys: (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean).map(() => "***"),
             _apiKeyCount: (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean).length,
             models: (process.env.GEMINI_MODELS || "gemini-2.5-flash").split(",").filter(Boolean),
-            facebookPixelIds: [process.env.FACEBOOK_PIXEL_ID].filter(Boolean),
-            googleAnalyticsIds: [process.env.GA4_ID].filter(Boolean),
-            products: products || [],
-            statuses: [
+            catalogItemTemplate: legacyConfig.catalogItemTemplate || "{n}. {name} [RENDER_PRODUCT:{id}] : {benefits} Composition : {composition} Prix : {price} {currency}.",
+            welcomeMessage: process.env.WELCOME_MESSAGE || legacyConfig.welcomeMessage || "",
+            facebookPixelIds: [process.env.FACEBOOK_PIXEL_ID].filter(Boolean).length
+                ? [process.env.FACEBOOK_PIXEL_ID].filter(Boolean)
+                : (legacyConfig.facebookPixelIds || []),
+            googleAnalyticsIds: [process.env.GA4_ID].filter(Boolean).length
+                ? [process.env.GA4_ID].filter(Boolean)
+                : (legacyConfig.googleAnalyticsIds || []),
+            products: products.length ? products : (0, legacy_config_js_1.getLegacyProducts)(),
+            statuses: legacyStatuses.length ? legacyStatuses : [
                 "attente de confirm tel",
                 "cde double",
                 "a expedier",

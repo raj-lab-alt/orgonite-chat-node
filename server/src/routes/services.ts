@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { getLegacyServices } from "../lib/legacy-config.js";
 
 export const servicesRouter = Router();
 
@@ -21,7 +22,10 @@ servicesRouter.get("/", async (_req: Request, res: Response) => {
     });
 
     if (error) return res.status(500).json({ error: error.message });
-    res.json((data || []).map(formatService));
+    const rows = data?.length
+      ? data
+      : getLegacyServices().filter((s: any) => isAdminMount || s.visible !== false);
+    res.json(rows.map(formatService));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -36,7 +40,8 @@ servicesRouter.get("/admin", requireAdmin, async (_req: Request, res: Response) 
       .order("created_at", { ascending: false });
 
     if (error) return res.status(500).json({ error: error.message });
-    res.json((data || []).map(formatService));
+    const rows = data?.length ? data : getLegacyServices();
+    res.json(rows.map(formatService));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -170,16 +175,16 @@ function formatService(row: any) {
     slug: row.slug,
     subtitle: row.subtitle || "",
     price: parseFloat(row.price) || 0,
-    originalPrice: row.original_price ? parseFloat(row.original_price) : null,
+    originalPrice: row.original_price || row.originalPrice ? parseFloat(row.original_price ?? row.originalPrice) : null,
     icon: row.icon || "🔮",
-    imageUrl: row.image_url || "",
+    imageUrl: row.image_url || row.imageUrl || "",
     color: row.color || "#8b5cf6",
     description: row.description || "",
     benefits: row.benefits || "",
     duration: row.duration || "",
     format: row.format || "",
-    productIds: (row.service_products || []).map((sp: any) => sp.product_id),
-    visible: row.visible,
+    productIds: row.productIds || (row.service_products || []).map((sp: any) => sp.product_id),
+    visible: row.visible !== false,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

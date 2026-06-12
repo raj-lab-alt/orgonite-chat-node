@@ -14,6 +14,7 @@ import {
   normalizeOrderPayload,
 } from "../services/orders.js";
 import { checkRateLimit } from "../services/rate-limit.js";
+import { getLegacyProducts } from "../lib/legacy-config.js";
 
 export const chatRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -28,6 +29,7 @@ async function getConfig() {
   const models = (process.env.GEMINI_MODELS || "gemini-2.5-flash").split(",").filter(Boolean);
   let products: any[] = [];
   try { const { data } = await supabase.from("products").select("*").eq("visible", true); if (data) products = data; } catch {}
+  if (!products.length) products = getLegacyProducts().filter((p: any) => p.visible !== false);
   return { apiKeys, models, products };
 }
 

@@ -12,6 +12,7 @@ const prompt_js_1 = require("../lib/prompt.js");
 const gemini_js_1 = require("../services/gemini.js");
 const orders_js_1 = require("../services/orders.js");
 const rate_limit_js_1 = require("../services/rate-limit.js");
+const legacy_config_js_1 = require("../lib/legacy-config.js");
 exports.chatRouter = (0, express_1.Router)();
 const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const DEFAULT_STATUSES = [
@@ -28,6 +29,8 @@ async function getConfig() {
             products = data;
     }
     catch { }
+    if (!products.length)
+        products = (0, legacy_config_js_1.getLegacyProducts)().filter((p) => p.visible !== false);
     return { apiKeys, models, products };
 }
 function catalogProducts(products) {
