@@ -7,11 +7,18 @@ export const productsRouter = Router();
 // Public: list visible products
 productsRouter.get("/", async (_req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
+    const isAdminMount = _req.baseUrl.includes("/api/admin/");
+    let query = supabase
       .from("products")
-      .select("*")
-      .eq("visible", true)
-      .order("name");
+      .select("*");
+
+    if (!isAdminMount) {
+      query = query.eq("visible", true);
+    }
+
+    const { data, error } = await query.order(isAdminMount ? "created_at" : "name", {
+      ascending: !isAdminMount,
+    });
 
     if (error) return res.status(500).json({ error: error.message });
 

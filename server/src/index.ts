@@ -10,6 +10,7 @@ import { productsRouter } from "./routes/products.js";
 import { servicesRouter } from "./routes/services.js";
 import { adminRouter } from "./routes/admin.js";
 import { trackingRouter } from "./routes/tracking.js";
+import { requireAdmin } from "./middleware/auth.js";
 
 dotenv.config({ path: resolve(__dirname, "../../.env") });
 
@@ -25,6 +26,8 @@ app.use("/api/chat", chatRouter);
 app.use("/api/orders", ordersRouter);
 app.use("/api/products", productsRouter);
 app.use("/api/services", servicesRouter);
+app.use("/api/admin/products", requireAdmin, productsRouter);
+app.use("/api/admin/services", requireAdmin, servicesRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api", trackingRouter);
 
@@ -45,6 +48,15 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 const clientDist = resolve(__dirname, "../../client/dist");
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
+  app.get("/admin", (_req, res) => {
+    res.sendFile(resolve(clientDist, "admin.html"));
+  });
+  app.get("/admin/", (_req, res) => {
+    res.sendFile(resolve(clientDist, "admin.html"));
+  });
+  app.get("/sitemap.xml", (_req, res) => {
+    res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+  });
   app.use((_req, res) => {
     res.sendFile(resolve(clientDist, "index.html"));
   });

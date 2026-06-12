@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { adminPassword, adminToken } from "../lib/admin-auth.js";
 
 export const adminRouter = Router();
 
@@ -8,8 +9,15 @@ adminRouter.post("/login", async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email et mot de passe requis" });
+    if (!password) {
+      return res.status(400).json({ error: "Mot de passe requis" });
+    }
+
+    if (!email) {
+      if (password !== adminPassword()) {
+        return res.status(401).json({ error: "Identifiants invalides" });
+      }
+      return res.json({ token: adminToken(), user: { role: "admin" } });
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({

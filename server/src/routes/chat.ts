@@ -38,8 +38,14 @@ function catalogProducts(products: any[]) {
   }));
 }
 
-async function handleChatSSE(
-  res: Response,
+interface ChatResult {
+  reply: string;
+  order: any;
+  product: any;
+  products: any[];
+}
+
+async function generateChatResult(
   message: string,
   extraFields: any,
   history: any[],
@@ -47,16 +53,10 @@ async function handleChatSSE(
   conversationMode: string,
   isVoice: boolean,
   productType: string,
-) {
+): Promise<ChatResult> {
   const { apiKeys, models, products } = await getConfig();
   const catalog = catalogProducts(products);
   const systemPrompt = getSystemPrompt(catalog, undefined, undefined, productType);
-
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-  });
 
   let fullReply = "";
 
@@ -68,16 +68,12 @@ async function handleChatSSE(
 
     for await (const chunk of stream) {
       fullReply += chunk;
-      res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
     }
   } catch (err: any) {
-    console.error("Gemini stream error:", err.message);
-    const errorReply = "Desole, une erreur est survenue. Veuillez reessayer.";
-    res.write(`data: ${JSON.stringify({ text: errorReply })}\n\n`);
-    fullReply = errorReply;
+    console.error("Gemini chat error:", err.message);
+    fullReply = "Desole, une erreur est survenue. Veuillez reessayer.";
   }
 
-  // Process order
   const { cleanReply, orderData } = detectOrderFromReply(fullReply);
   let savedOrder = null;
 
@@ -94,9 +90,33 @@ async function handleChatSSE(
     }
   }
 
-  const { productData, productList } = detectProductsFromReply(cleanReply || fullReply, products);
+  const reply = cleanReply || fullReply;
+  const { productData, productList } = detectProductsFromReply(reply, products);
 
-  res.write(`data: ${JSON.stringify({ done: true, reply: cleanReply || fullReply, order: savedOrder, product: productData, products: productList })}\n\n`);
+  return { reply, order: savedOrder, product: productData, products: productList };
+}
+
+async function handleChatSSE(
+  res: Response,
+  message: string,
+  extraFields: any,
+  history: any[],
+  productId: string | null,
+  conversationMode: string,
+  isVoice: boolean,
+  productType: string,
+) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+
+  const result = await generateChatResult(
+    message, extraFields, history, productId, conversationMode, isVoice, productType
+  );
+  res.write(`data: ${JSON.stringify({ text: result.reply })}\n\n`);
+  res.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
   res.write("data: [DONE]\n\n");
   res.end();
 }
@@ -106,7 +126,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
   try {
     await checkRateLimit();
     const body = z.object({
-      message: z.string().min(1).max(2000),
+      message: z.string().max(2000).default(""),
       imageBase64: z.string().optional(),
       imageMimeType: z.string().optional(),
       productId: z.string().nullable().optional(),
@@ -114,6 +134,10 @@ chatRouter.post("/", async (req: Request, res: Response) => {
       conversationMode: z.string().default(""),
       history: z.array(z.any()).default([]),
       orderConfirmed: z.boolean().default(false),
+      stream: z.boolean().optional(),
+    }).refine((value) => value.message.trim().length > 0 || Boolean(value.imageBase64), {
+      message: "message ou image requis",
+      path: ["message"],
     }).parse(req.body);
 
     let message = body.message;
@@ -121,12 +145,23 @@ chatRouter.post("/", async (req: Request, res: Response) => {
       message = `[INSTRUCTION]Le prospect a deja confirme sa commande via la modale. NE PAS demander de confirmation ni re-presenter l'outil. Suivre le Closing normal etape par etape (nom → gouvernorat → adresse → telephone → disponibilite). Une fois la commande creee avec <ORDER>, AVANT d'envoyer le message de confirmation finale, proposer OBLIGATOIREMENT l'upsell livraison offerte des 2 outils. Ne pas sauter l'upsell.[/INSTRUCTION] ${message}`;
     }
 
-    await handleChatSSE(res, message, {
+    const extraFields = {
       imageBase64: body.imageBase64 || null,
       imageMimeType: body.imageMimeType || null,
       audioBase64: null,
       audioMimeType: null,
-    }, body.history, body.productId || null, body.conversationMode, false, body.productType);
+    };
+
+    const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
+    if (wantsStream) {
+      await handleChatSSE(res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType);
+      return;
+    }
+
+    const result = await generateChatResult(
+      message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType
+    );
+    res.json(result);
   } catch (err: any) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: err.errors });
@@ -157,8 +192,17 @@ chatRouter.post("/voice", upload.single("audio"), async (req: Request, res: Resp
       try { history = JSON.parse(req.body.history as string); } catch {}
     }
 
-    await handleChatSSE(res, message, { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType },
-      history, productId, conversationMode, true, productType);
+    const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
+    const wantsStream = req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
+    if (wantsStream) {
+      await handleChatSSE(res, message, extraFields, history, productId, conversationMode, true, productType);
+      return;
+    }
+
+    const result = await generateChatResult(
+      message, extraFields, history, productId, conversationMode, true, productType
+    );
+    res.json(result);
   } catch (err: any) {
     console.error("Voice chat error:", err);
     res.status(500).json({ error: "Erreur interne du serveur" });

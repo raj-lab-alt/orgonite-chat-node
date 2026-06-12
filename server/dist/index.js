@@ -15,6 +15,7 @@ const products_js_1 = require("./routes/products.js");
 const services_js_1 = require("./routes/services.js");
 const admin_js_1 = require("./routes/admin.js");
 const tracking_js_1 = require("./routes/tracking.js");
+const auth_js_1 = require("./middleware/auth.js");
 dotenv_1.default.config({ path: (0, path_1.resolve)(__dirname, "../../.env") });
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
@@ -26,6 +27,8 @@ app.use("/api/chat", chat_js_1.chatRouter);
 app.use("/api/orders", orders_js_1.ordersRouter);
 app.use("/api/products", products_js_1.productsRouter);
 app.use("/api/services", services_js_1.servicesRouter);
+app.use("/api/admin/products", auth_js_1.requireAdmin, products_js_1.productsRouter);
+app.use("/api/admin/services", auth_js_1.requireAdmin, services_js_1.servicesRouter);
 app.use("/api/admin", admin_js_1.adminRouter);
 app.use("/api", tracking_js_1.trackingRouter);
 app.get("/health", (_req, res) => {
@@ -44,6 +47,15 @@ app.use((err, _req, res, _next) => {
 const clientDist = (0, path_1.resolve)(__dirname, "../../client/dist");
 if ((0, fs_1.existsSync)(clientDist)) {
     app.use(express_1.default.static(clientDist));
+    app.get("/admin", (_req, res) => {
+        res.sendFile((0, path_1.resolve)(clientDist, "admin.html"));
+    });
+    app.get("/admin/", (_req, res) => {
+        res.sendFile((0, path_1.resolve)(clientDist, "admin.html"));
+    });
+    app.get("/sitemap.xml", (_req, res) => {
+        res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+    });
     app.use((_req, res) => {
         res.sendFile((0, path_1.resolve)(clientDist, "index.html"));
     });

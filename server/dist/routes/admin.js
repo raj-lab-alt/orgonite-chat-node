@@ -37,12 +37,19 @@ exports.adminRouter = void 0;
 const express_1 = require("express");
 const supabase_js_1 = require("../lib/supabase.js");
 const auth_js_1 = require("../middleware/auth.js");
+const admin_auth_js_1 = require("../lib/admin-auth.js");
 exports.adminRouter = (0, express_1.Router)();
 exports.adminRouter.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({ error: "Email et mot de passe requis" });
+        if (!password) {
+            return res.status(400).json({ error: "Mot de passe requis" });
+        }
+        if (!email) {
+            if (password !== (0, admin_auth_js_1.adminPassword)()) {
+                return res.status(401).json({ error: "Identifiants invalides" });
+            }
+            return res.json({ token: (0, admin_auth_js_1.adminToken)(), user: { role: "admin" } });
         }
         const { data, error } = await supabase_js_1.supabase.auth.signInWithPassword({
             email,

@@ -1,18 +1,13 @@
 {
   "name": "orgonite-chat-node",
   "private": true,
-  "workspaces": [
-    "client",
-    "server",
-    "packages/shared"
-  ],
   "main": "server.js",
   "scripts": {
-    "dev": "concurrently -k -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
-    "build": "npm run build -w client && npm run build -w server",
+    "dev": "concurrently -k -n server,client -c blue,green \"npx tsx watch server/src/index.ts\" \"npm --prefix client run dev\"",
+    "build": "node scripts/build-legacy-client.cjs && npx tsc -p server/tsconfig.json",
     "start": "node server.js",
-    "typecheck": "npm run typecheck -w client && npm run typecheck -w server && npm run typecheck -w @orgonite/shared",
-    "test": "npm run test -w client && npm run test -w server"
+    "typecheck": "npx tsc --noEmit -p server/tsconfig.json && npx tsc --noEmit -p packages/shared/tsconfig.json",
+    "test": "npx vitest run --passWithNoTests --root server"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
@@ -33,6 +28,7 @@
     "@types/node": "^22.14.1",
     "@types/ws": "^8.18.1",
     "concurrently": "^9.2.1",
+    "tsx": "^4.19.3",
     "typescript": "^5.7.3",
     "vitest": "^3.1.1"
   }

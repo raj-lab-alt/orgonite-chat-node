@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { supabase } from "../lib/supabase.js";
+import { isAdminToken } from "../lib/admin-auth.js";
 
 export async function requireAdmin(
   req: Request,
@@ -13,6 +14,11 @@ export async function requireAdmin(
   }
 
   const token = auth.slice(7);
+
+  if (isAdminToken(token)) {
+    (req as any).user = { role: "admin" };
+    return next();
+  }
 
   const {
     data: { user },

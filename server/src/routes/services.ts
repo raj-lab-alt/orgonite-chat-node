@@ -7,11 +7,18 @@ export const servicesRouter = Router();
 // Public: list visible services
 servicesRouter.get("/", async (_req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
+    const isAdminMount = _req.baseUrl.includes("/api/admin/");
+    let query = supabase
       .from("services")
-      .select("*, service_products(product_id)")
-      .eq("visible", true)
-      .order("name");
+      .select("*, service_products(product_id)");
+
+    if (!isAdminMount) {
+      query = query.eq("visible", true);
+    }
+
+    const { data, error } = await query.order(isAdminMount ? "created_at" : "name", {
+      ascending: !isAdminMount,
+    });
 
     if (error) return res.status(500).json({ error: error.message });
     res.json((data || []).map(formatService));
