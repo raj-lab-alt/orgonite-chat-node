@@ -2,9 +2,38 @@ import { Router, Request, Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { adminPassword, adminToken } from "../lib/admin-auth.js";
-import { getLegacyConfig, getLegacyProducts, getLegacyStatuses } from "../lib/legacy-config.js";
+import { getAppConfig, maskApiKeys, updateAppConfig } from "../lib/app-config.js";
 
 export const adminRouter = Router();
+
+async function loadAdminProducts() {
+  const { data } = await supabase
+    .from("products")
+    .select("*")
+    .order("name");
+  return data || [];
+}
+
+async function buildConfigResponse() {
+  const [config, products] = await Promise.all([
+    getAppConfig(),
+    loadAdminProducts().catch(() => []),
+  ]);
+
+  return {
+    systemPrompt: config.systemPrompt,
+    _promptSource: config.source,
+    apiKeys: maskApiKeys(config.geminiApiKeys),
+    _apiKeyCount: config.geminiApiKeys.length,
+    models: config.geminiModels,
+    catalogItemTemplate: config.catalogItemTemplate,
+    welcomeMessage: config.welcomeMessage,
+    facebookPixelIds: config.facebookPixelIds,
+    googleAnalyticsIds: config.googleAnalyticsIds,
+    products,
+    statuses: config.statuses,
+  };
+}
 
 adminRouter.post("/login", async (req: Request, res: Response) => {
   try {
@@ -46,58 +75,7 @@ adminRouter.get("/check", requireAdmin, (_req: Request, res: Response) => {
 
 adminRouter.get("/config", requireAdmin, async (_req: Request, res: Response) => {
   try {
-    // Read system prompt from file
-    const fs = await import("fs");
-    const path = await import("path");
-    const promptFile = path.resolve(__dirname, "../../prompt-amine-structure.txt");
-
-    let systemPrompt = "";
-    let promptSource = "config";
-
-    if (fs.existsSync(promptFile)) {
-      systemPrompt = fs.readFileSync(promptFile, "utf-8");
-      promptSource = "file";
-    }
-
-    let products: any[] = [];
-    try {
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .order("name");
-      products = data || [];
-    } catch {}
-
-    const legacyConfig = getLegacyConfig();
-    const legacyStatuses = getLegacyStatuses();
-
-    res.json({
-      systemPrompt,
-      _promptSource: promptSource,
-      apiKeys: (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean).map(() => "***"),
-      _apiKeyCount: (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean).length,
-      models: (process.env.GEMINI_MODELS || "gemini-2.5-flash").split(",").filter(Boolean),
-      catalogItemTemplate: legacyConfig.catalogItemTemplate || "{n}. {name} [RENDER_PRODUCT:{id}] : {benefits} Composition : {composition} Prix : {price} {currency}.",
-      welcomeMessage: process.env.WELCOME_MESSAGE || legacyConfig.welcomeMessage || "",
-      facebookPixelIds: [process.env.FACEBOOK_PIXEL_ID].filter(Boolean).length
-        ? [process.env.FACEBOOK_PIXEL_ID].filter(Boolean)
-        : (legacyConfig.facebookPixelIds || []),
-      googleAnalyticsIds: [process.env.GA4_ID].filter(Boolean).length
-        ? [process.env.GA4_ID].filter(Boolean)
-        : (legacyConfig.googleAnalyticsIds || []),
-      products: products.length ? products : getLegacyProducts(),
-      statuses: legacyStatuses.length ? legacyStatuses : [
-        "attente de confirm tel",
-        "cde double",
-        "a expedier",
-        "injoignable",
-        "confirmee att. env.",
-        "livree",
-        "echouee",
-        "nn qualifiee",
-        "Annulee",
-      ],
-    });
+    res.json(await buildConfigResponse());
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -106,17 +84,26 @@ adminRouter.get("/config", requireAdmin, async (_req: Request, res: Response) =>
 adminRouter.put("/config", requireAdmin, async (req: Request, res: Response) => {
   try {
     const body = req.body;
+    const update: any = {};
 
-    // If systemPrompt provided, write to prompt file
-    if (body.systemPrompt) {
-      const fs = await import("fs");
-      const path = await import("path");
-      const promptFile = path.resolve(__dirname, "../../prompt-amine-structure.txt");
-      fs.writeFileSync(promptFile, body.systemPrompt, "utf-8");
+    if (body.systemPrompt !== undefined) update.systemPrompt = String(body.systemPrompt);
+    if (body.catalogItemTemplate !== undefined) update.catalogItemTemplate = String(body.catalogItemTemplate);
+    if (body.welcomeMessage !== undefined) update.welcomeMessage = String(body.welcomeMessage);
+    if (body.facebookPixelIds !== undefined) update.facebookPixelIds = normalizeStringList(body.facebookPixelIds);
+    if (body.googleAnalyticsIds !== undefined) update.googleAnalyticsIds = normalizeStringList(body.googleAnalyticsIds);
+    if (body.statuses !== undefined) update.statuses = normalizeStringList(body.statuses);
+    if (body.apiKeys !== undefined) update.geminiApiKeys = normalizeStringList(body.apiKeys);
+    if (body.models !== undefined) update.geminiModels = normalizeStringList(body.models);
+
+    if (update.statuses?.length === 0) {
+      return res.status(400).json({ error: "Au moins un statut est requis" });
+    }
+    if (update.geminiModels?.length === 0) {
+      return res.status(400).json({ error: "Au moins un modele Gemini est requis" });
     }
 
-    // Statuses are stored in env or config table
-    res.json({ success: true });
+    await updateAppConfig(update);
+    res.json(await buildConfigResponse());
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -221,12 +208,16 @@ adminRouter.post("/migrate-schema", requireAdmin, async (_req: Request, res: Res
     const fs = await import("fs");
     const path = await import("path");
 
-    const sqlPath = path.resolve(__dirname, "../../supabase/migrations/001_initial_schema.sql");
-    if (!fs.existsSync(sqlPath)) {
-      return res.status(404).json({ error: "Fichier migration introuvable" });
+    const migrationsDir = path.resolve(process.cwd(), "supabase/migrations");
+    if (!fs.existsSync(migrationsDir)) {
+      return res.status(404).json({ error: "Dossier migrations introuvable" });
     }
 
-    const sql = fs.readFileSync(sqlPath, "utf-8");
+    const sql = fs.readdirSync(migrationsDir)
+      .filter((file) => file.endsWith(".sql"))
+      .sort()
+      .map((file) => fs.readFileSync(path.join(migrationsDir, file), "utf-8"))
+      .join("\n\n");
 
     const mgmtToken = process.env.SUPABASE_MGMT_TOKEN;
     const ref = process.env.SUPABASE_REF;
@@ -252,8 +243,13 @@ adminRouter.post("/migrate-schema", requireAdmin, async (_req: Request, res: Res
       return res.status(500).json({ error: text });
     }
 
-    res.json({ success: true, message: "Migration executed" });
+    res.json({ success: true, message: "Migrations executed" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
+
+function normalizeStringList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item).trim()).filter(Boolean);
+}

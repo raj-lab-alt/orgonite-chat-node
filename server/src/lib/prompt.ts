@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
-const promptFilePath = resolve(__dirname, "../../prompt-amine-structure.txt");
+const promptFilePath = resolve(process.cwd(), "prompt-amine-structure.txt");
 
 interface Product {
   id: string;
@@ -22,10 +22,10 @@ export function getSystemPrompt(
 ): string {
   let base = "";
 
-  if (existsSync(promptFilePath)) {
-    base = readFileSync(promptFilePath, "utf-8");
-  } else if (systemPrompt) {
+  if (systemPrompt) {
     base = systemPrompt;
+  } else if (existsSync(promptFilePath)) {
+    base = readFileSync(promptFilePath, "utf-8");
   }
 
   const tmpl =

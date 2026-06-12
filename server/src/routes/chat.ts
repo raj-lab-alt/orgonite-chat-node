@@ -14,23 +14,23 @@ import {
   normalizeOrderPayload,
 } from "../services/orders.js";
 import { checkRateLimit } from "../services/rate-limit.js";
-import { getLegacyProducts } from "../lib/legacy-config.js";
+import { getAppConfig } from "../lib/app-config.js";
 
 export const chatRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-const DEFAULT_STATUSES = [
-  "attente de confirm tel", "cde double", "a expedier", "injoignable",
-  "confirmee att. env.", "livree", "echouee", "nn qualifiee", "Annulee",
-];
-
 async function getConfig() {
-  const apiKeys = (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean);
-  const models = (process.env.GEMINI_MODELS || "gemini-2.5-flash").split(",").filter(Boolean);
+  const appConfig = await getAppConfig();
   let products: any[] = [];
   try { const { data } = await supabase.from("products").select("*").eq("visible", true); if (data) products = data; } catch {}
-  if (!products.length) products = getLegacyProducts().filter((p: any) => p.visible !== false);
-  return { apiKeys, models, products };
+  return {
+    apiKeys: appConfig.geminiApiKeys,
+    models: appConfig.geminiModels,
+    products,
+    statuses: appConfig.statuses,
+    systemPrompt: appConfig.systemPrompt,
+    catalogItemTemplate: appConfig.catalogItemTemplate,
+  };
 }
 
 function catalogProducts(products: any[]) {
@@ -56,9 +56,9 @@ async function generateChatResult(
   isVoice: boolean,
   productType: string,
 ): Promise<ChatResult> {
-  const { apiKeys, models, products } = await getConfig();
+  const { apiKeys, models, products, statuses, systemPrompt: dbSystemPrompt, catalogItemTemplate } = await getConfig();
   const catalog = catalogProducts(products);
-  const systemPrompt = getSystemPrompt(catalog, undefined, undefined, productType);
+  const systemPrompt = getSystemPrompt(catalog, dbSystemPrompt, catalogItemTemplate, productType);
 
   let fullReply = "";
 
@@ -83,11 +83,11 @@ async function generateChatResult(
     const normalized = normalizeOrderPayload(orderData);
     normalized.id = generateOrderId();
     normalized.date = new Date().toISOString();
-    normalized.statut = DEFAULT_STATUSES[0];
+    normalized.statut = statuses[0];
 
     if (normalized.produit?.trim()) {
       applyOrderAmounts(normalized, products.map((p: any) => ({ name: p.name, price: p.price, id: p.id })));
-      const saved = await saveOrderWithoutDuplicate(normalized, DEFAULT_STATUSES, products.map((p: any) => ({ name: p.name, price: p.price, id: p.id })));
+      const saved = await saveOrderWithoutDuplicate(normalized, statuses, products.map((p: any) => ({ name: p.name, price: p.price, id: p.id })));
       savedOrder = orderResponse(saved.order, saved.created);
     }
   }

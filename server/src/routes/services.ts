@@ -1,7 +1,6 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
-import { getLegacyServices } from "../lib/legacy-config.js";
 
 export const servicesRouter = Router();
 
@@ -22,10 +21,7 @@ servicesRouter.get("/", async (_req: Request, res: Response) => {
     });
 
     if (error) return res.status(500).json({ error: error.message });
-    const rows = data?.length
-      ? data
-      : getLegacyServices().filter((s: any) => isAdminMount || s.visible !== false);
-    res.json(rows.map(formatService));
+    res.json((data || []).map(formatService));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -40,8 +36,7 @@ servicesRouter.get("/admin", requireAdmin, async (_req: Request, res: Response) 
       .order("created_at", { ascending: false });
 
     if (error) return res.status(500).json({ error: error.message });
-    const rows = data?.length ? data : getLegacyServices();
-    res.json(rows.map(formatService));
+    res.json((data || []).map(formatService));
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
