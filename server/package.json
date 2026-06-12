@@ -13,17 +13,20 @@
   },
   "dependencies": {
     "@orgonite/shared": "*",
-    "express": "^5.1.0",
-    "cors": "^2.8.5",
-    "helmet": "^8.0.0",
     "@supabase/supabase-js": "^2.49.4",
-    "zod": "^3.24.3",
+    "@types/multer": "^2.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "helmet": "^8.0.0",
+    "multer": "^2.1.1",
+    "pg": "^8.21.0",
     "uuid": "^11.1.0",
-    "dotenv": "^16.4.7"
+    "zod": "^3.24.3"
   },
   "devDependencies": {
-    "@types/express": "^5.0.1",
     "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
     "@types/node": "^22.14.1",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",
