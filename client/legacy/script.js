@@ -584,6 +584,22 @@ function clearChatMessages() {
   [...messagesEl.children].forEach(child => {
     if (child.id !== 'scrollAnchor') child.remove();
   });
+  scrollChatToBottom('auto', true);
+}
+
+function isNearChatBottom(threshold = 160) {
+  return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight <= threshold;
+}
+
+function scrollChatToBottom(behavior = 'smooth', force = false) {
+  if (!messagesEl) return;
+  if (!force && !isNearChatBottom()) return;
+  requestAnimationFrame(() => {
+    messagesEl.scrollTo({
+      top: messagesEl.scrollHeight,
+      behavior
+    });
+  });
 }
 
 function inferSalesStep(text, hasOrder = false) {
@@ -651,11 +667,13 @@ function updateSendButton() {
 function addMessage(role, text, imageDataUrl, options = {}) {
   const div = document.createElement('div');
   const visibleText = stripInternalPromptTags(text);
+  const shouldFollow = role === 'user' || role === 'error' || isNearChatBottom();
 
   if (role === 'error') {
     div.className = 'bubble bubble-error';
     div.textContent = visibleText;
     messagesEl.insertBefore(div, document.getElementById('scrollAnchor'));
+    scrollChatToBottom('smooth', shouldFollow);
     return;
   }
 
@@ -676,6 +694,7 @@ function addMessage(role, text, imageDataUrl, options = {}) {
   div.appendChild(meta);
 
   messagesEl.insertBefore(div, document.getElementById('scrollAnchor'));
+  scrollChatToBottom('smooth', shouldFollow);
 }
 
 window.sendOrderIntent = async function(productName) {
@@ -779,6 +798,7 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
 
   const anchor = document.getElementById('scrollAnchor');
   messagesEl.insertBefore(messageBubble, anchor);
+  scrollChatToBottom('smooth', true);
 
   const elapsed = options.elapsed || 0;
   const totalDelay = humanizeDelay(cleanedText.length);
@@ -787,6 +807,7 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
   setTimeout(() => {
     hideTyping();
     textContainer.innerHTML = formattedHtml;
+    scrollChatToBottom('smooth', true);
     if (extractedIds.length > 0) {
       const delay = options.cardDelay || 600;
       extractedIds.forEach((id, i) => {
@@ -794,6 +815,7 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
           const product = productCatalog.find(p => p.id === id);
           if (!product) return;
           messagesEl.insertBefore(renderProductCardWithButtons(product), anchor);
+          scrollChatToBottom('smooth', true);
         }, delay + i * 200);
       });
     }
@@ -804,6 +826,7 @@ function showTyping() {
   const anchor = document.getElementById('scrollAnchor');
   messagesEl.insertBefore(typingIndicator, anchor);
   typingIndicator.style.display = 'flex';
+  scrollChatToBottom('smooth', true);
 }
 
 function hideTyping() {
@@ -1454,11 +1477,7 @@ function chatAboutProduct(productId, action) {
     messageInput.value = msg;
     autoResize(messageInput);
     sendMessage();
-    setTimeout(() => {
-      const anchor = document.getElementById('scrollAnchor');
-      if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      else chatInputArea?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 150);
+    setTimeout(() => scrollChatToBottom('smooth', true), 150);
   });
 }
 
@@ -1499,6 +1518,7 @@ function afficherSuggestionsAccueil() {
   ];
 
   messagesEl.insertBefore(container, document.getElementById('scrollAnchor'));
+  scrollChatToBottom('auto', true);
 
   const fullTitle = "Qu'est-ce qui t'amène ? Choisis ce qui résonne avec toi 👇";
   title.textContent = fullTitle;
@@ -1513,6 +1533,7 @@ function afficherSuggestionsAccueil() {
         sendMessage();
       });
       container.appendChild(pill);
+      scrollChatToBottom('smooth', true);
     }, i * 120);
   });
 }
@@ -1539,6 +1560,7 @@ async function startNewProspect(product, productId) {
     immediateProductContainer.className = 'flex flex-wrap gap-4 my-3 justify-center w-full product-card-accent';
     immediateProductContainer.appendChild(renderProductCardWithButtons(product));
     messagesEl.insertBefore(immediateProductContainer, document.getElementById('scrollAnchor'));
+    scrollChatToBottom('smooth', true);
   } finally {
     welcomeLock = false;
     updateSendButton();
@@ -1633,6 +1655,7 @@ function createAmineBubble() {
   meta.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   div.appendChild(meta);
   messagesEl.insertBefore(div, document.getElementById('scrollAnchor'));
+  scrollChatToBottom('smooth', true);
   return div;
 }
 

@@ -172,6 +172,8 @@
     .chat-messages {
       flex: 1;
       overflow-y: auto;
+      overscroll-behavior: contain;
+      scroll-behavior: smooth;
       padding: 14px 14px 8px;
       display: flex;
       flex-direction: column;
@@ -425,7 +427,7 @@
     }
 
     /* ─── Scroll anchor ─── */
-    #scrollAnchor { height: 1px; }
+    #scrollAnchor { height: 1px; flex: 0 0 1px; }
 
     /* Amine typewriter text */
     .amine-text { display: inline; }
