@@ -1,7 +1,6 @@
 {
   "name": "orgonite-chat-node",
   "private": true,
-  "type": "module",
   "main": "server.js",
   "workspaces": [
     "client",
