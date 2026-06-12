@@ -86,8 +86,8 @@ exports.chatRouter.post("/", async (req, res) => {
         await (0, rate_limit_js_1.checkRateLimit)();
         const body = zod_1.z.object({
             message: zod_1.z.string().max(2000).default(""),
-            imageBase64: zod_1.z.string().optional(),
-            imageMimeType: zod_1.z.string().optional(),
+            imageBase64: zod_1.z.string().nullable().optional(),
+            imageMimeType: zod_1.z.string().nullable().optional(),
             productId: zod_1.z.string().nullable().optional(),
             productType: zod_1.z.string().default("general"),
             conversationMode: zod_1.z.string().default(""),
@@ -118,7 +118,9 @@ exports.chatRouter.post("/", async (req, res) => {
     }
     catch (err) {
         if (err instanceof zod_1.z.ZodError) {
-            return res.status(400).json({ error: err.errors });
+            return res.status(400).json({
+                error: err.errors.map((issue) => issue.message).join(", "),
+            });
         }
         console.error("Chat error:", err);
         res.status(500).json({ error: "Erreur interne du serveur" });
