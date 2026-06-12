@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
 import dotenv from "dotenv";
-dotenv.config();
+import { resolve } from "path";
+
+dotenv.config({ path: resolve(__dirname, "../../../.env") });
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;

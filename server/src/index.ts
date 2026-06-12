@@ -11,7 +11,7 @@ import { servicesRouter } from "./routes/services.js";
 import { adminRouter } from "./routes/admin.js";
 import { trackingRouter } from "./routes/tracking.js";
 
-dotenv.config();
+dotenv.config({ path: resolve(__dirname, "../../.env") });
 
 const app = express();
 const PORT = process.env.PORT || 3001;

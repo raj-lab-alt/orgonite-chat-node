@@ -15,7 +15,7 @@ const products_js_1 = require("./routes/products.js");
 const services_js_1 = require("./routes/services.js");
 const admin_js_1 = require("./routes/admin.js");
 const tracking_js_1 = require("./routes/tracking.js");
-dotenv_1.default.config();
+dotenv_1.default.config({ path: (0, path_1.resolve)(__dirname, "../../.env") });
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
 app.use((0, helmet_1.default)({ contentSecurityPolicy: false }));

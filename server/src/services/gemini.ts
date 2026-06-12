@@ -50,6 +50,20 @@ export function buildContents(messages: ChatMessage[]): GeminiContent[] {
   return contents;
 }
 
+async function parseGeminiError(response: Response): Promise<GeminiError> {
+  const text = await response.text();
+  let message = text || response.statusText || "Gemini request failed";
+
+  try {
+    const data = JSON.parse(text);
+    message = data.error?.message || message;
+  } catch {
+    // Gemini/proxy outages can return plain text or HTML. Keep the HTTP status.
+  }
+
+  return new GeminiError(message, response.status);
+}
+
 export async function callGemini(
   apiKey: string,
   model: string,
@@ -72,12 +86,7 @@ export async function callGemini(
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      const data = JSON.parse(text);
-      throw new GeminiError(
-        data.error?.message || text,
-        response.status
-      );
+      throw await parseGeminiError(response);
     }
 
     const reader = response.body?.getReader();
@@ -128,12 +137,7 @@ export async function callGemini(
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      const data = JSON.parse(text);
-      throw new GeminiError(
-        data.error?.message || text,
-        response.status
-      );
+      throw await parseGeminiError(response);
     }
 
     const data = await response.json();

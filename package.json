@@ -1,11 +1,18 @@
 {
   "name": "orgonite-chat-node",
   "private": true,
+  "workspaces": [
+    "client",
+    "server",
+    "packages/shared"
+  ],
   "main": "server.js",
   "scripts": {
-    "dev": "npm --prefix server run dev",
-    "build": "npm --prefix client run build && npm --prefix server run build",
-    "start": "node server.js"
+    "dev": "concurrently -k -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w client && npm run build -w server",
+    "start": "node server.js",
+    "typecheck": "npm run typecheck -w client && npm run typecheck -w server && npm run typecheck -w @orgonite/shared",
+    "test": "npm run test -w client && npm run test -w server"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
@@ -25,6 +32,7 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^22.14.1",
     "@types/ws": "^8.18.1",
+    "concurrently": "^9.2.1",
     "typescript": "^5.7.3",
     "vitest": "^3.1.1"
   }

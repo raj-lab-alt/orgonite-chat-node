@@ -7,7 +7,8 @@ exports.supabase = void 0;
 const supabase_js_1 = require("@supabase/supabase-js");
 const ws_1 = __importDefault(require("ws"));
 const dotenv_1 = __importDefault(require("dotenv"));
-dotenv_1.default.config();
+const path_1 = require("path");
+dotenv_1.default.config({ path: (0, path_1.resolve)(__dirname, "../../../.env") });
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 if (!supabaseUrl || !supabaseServiceKey) {

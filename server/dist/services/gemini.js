@@ -32,6 +32,18 @@ function buildContents(messages) {
     }
     return contents;
 }
+async function parseGeminiError(response) {
+    const text = await response.text();
+    let message = text || response.statusText || "Gemini request failed";
+    try {
+        const data = JSON.parse(text);
+        message = data.error?.message || message;
+    }
+    catch {
+        // Gemini/proxy outages can return plain text or HTML. Keep the HTTP status.
+    }
+    return new GeminiError(message, response.status);
+}
 async function callGemini(apiKey, model, contents, systemPrompt, onChunk) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
     if (onChunk) {
@@ -46,9 +58,7 @@ async function callGemini(apiKey, model, contents, systemPrompt, onChunk) {
             }),
         });
         if (!response.ok) {
-            const text = await response.text();
-            const data = JSON.parse(text);
-            throw new GeminiError(data.error?.message || text, response.status);
+            throw await parseGeminiError(response);
         }
         const reader = response.body?.getReader();
         if (!reader)
@@ -96,9 +106,7 @@ async function callGemini(apiKey, model, contents, systemPrompt, onChunk) {
             }),
         });
         if (!response.ok) {
-            const text = await response.text();
-            const data = JSON.parse(text);
-            throw new GeminiError(data.error?.message || text, response.status);
+            throw await parseGeminiError(response);
         }
         const data = await response.json();
         return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
