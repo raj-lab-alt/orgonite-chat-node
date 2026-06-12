@@ -10,8 +10,4 @@ if (!existsSync(serverEntry)) {
 
 console.log("Starting Orgonite Chat Node...");
 
-import(serverEntry).catch((err) => {
-  console.error("ERROR: Server startup failed:", err?.message || err);
-  if (err?.stack) console.error(err.stack);
-  process.exit(1);
-});
+require(serverEntry);

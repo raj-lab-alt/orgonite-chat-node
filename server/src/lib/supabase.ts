@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -13,5 +14,10 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 export const supabase = createClient(
   supabaseUrl || "",
-  supabaseServiceKey || ""
+  supabaseServiceKey || "",
+  {
+    realtime: {
+      transport: WebSocket as any,
+    },
+  }
 );

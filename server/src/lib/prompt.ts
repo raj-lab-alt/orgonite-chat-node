@@ -1,8 +1,6 @@
 import { readFileSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { resolve } from "path";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const promptFilePath = resolve(__dirname, "../../prompt-amine-structure.txt");
 
 interface Product {

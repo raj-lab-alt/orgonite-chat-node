@@ -40,8 +40,6 @@ adminRouter.get("/config", requireAdmin, async (_req: Request, res: Response) =>
     // Read system prompt from file
     const fs = await import("fs");
     const path = await import("path");
-    const { fileURLToPath } = await import("url");
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
     const promptFile = path.resolve(__dirname, "../../prompt-amine-structure.txt");
 
     let systemPrompt = "";
@@ -92,8 +90,6 @@ adminRouter.put("/config", requireAdmin, async (req: Request, res: Response) => 
     if (body.systemPrompt) {
       const fs = await import("fs");
       const path = await import("path");
-      const { fileURLToPath } = await import("url");
-      const __dirname = path.dirname(fileURLToPath(import.meta.url));
       const promptFile = path.resolve(__dirname, "../../prompt-amine-structure.txt");
       fs.writeFileSync(promptFile, body.systemPrompt, "utf-8");
     }
@@ -203,8 +199,6 @@ adminRouter.post("/migrate-schema", requireAdmin, async (_req: Request, res: Res
   try {
     const fs = await import("fs");
     const path = await import("path");
-    const { fileURLToPath } = await import("url");
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
     const sqlPath = path.resolve(__dirname, "../../supabase/migrations/001_initial_schema.sql");
     if (!fs.existsSync(sqlPath)) {

@@ -2,7 +2,6 @@
   "name": "server",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
@@ -21,12 +20,14 @@
     "multer": "^2.1.1",
     "pg": "^8.21.0",
     "uuid": "^11.1.0",
+    "ws": "^8.21.0",
     "zod": "^3.24.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
     "@types/node": "^22.14.1",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",
     "vitest": "^3.1.1"

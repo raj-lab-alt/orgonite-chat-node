@@ -2,8 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { resolve } from "path";
 import { existsSync } from "fs";
 import { chatRouter } from "./routes/chat.js";
 import { ordersRouter } from "./routes/orders.js";
@@ -43,11 +42,10 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 
 // Serve React app in production
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const clientDist = resolve(__dirname, "../../client/dist");
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  app.get("*", (_req, res) => {
+  app.use((_req, res) => {
     res.sendFile(resolve(clientDist, "index.html"));
   });
 }
