@@ -33,6 +33,15 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error("[ERROR]", err instanceof Error ? err.message : err);
+  if (err instanceof Error) console.error(err.stack);
+  res.status(500).json({
+    error: "Internal server error",
+    message: process.env.NODE_ENV !== "production" ? (err instanceof Error ? err.message : String(err)) : undefined,
+  });
+});
+
 // Serve React app in production
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const clientDist = resolve(__dirname, "../../client/dist");
