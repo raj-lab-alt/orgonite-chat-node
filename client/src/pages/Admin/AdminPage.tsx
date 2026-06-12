@@ -1,14 +1,125 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+import { useAdminStore } from "@/stores/admin-store";
+import LoginPage from "./LoginPage";
+import DashboardPage from "./DashboardPage";
+import OrdersPage from "./OrdersPage";
+import ProductsPage from "./ProductsPage";
+import ServicesPage from "./ServicesPage";
+import ConfigPage from "./ConfigPage";
+
+const NAV_ITEMS = [
+  { path: "/admin", label: "Dashboard", icon: "📊" },
+  { path: "/admin/orders", label: "Commandes", icon: "📦" },
+  { path: "/admin/products", label: "Produits", icon: "🏷️" },
+  { path: "/admin/services", label: "Services", icon: "🔮" },
+  { path: "/admin/config", label: "Configuration", icon: "⚙️" },
+  { path: "/", label: "Retour au chat", icon: "💬" },
+];
 
 export default function AdminPage() {
+  const { isAuth, checking, checkAuth, logout } = useAdminStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  if (checking) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuth) {
+    return <LoginPage />;
+  }
+
+  const isActive = (path: string) => {
+    if (path === "/admin") return location.pathname === "/admin";
+    return location.pathname.startsWith(path);
+  };
+
   return (
-    <div className="min-h-dvh bg-background">
-      <Routes>
-        <Route index element={<div className="p-4">Admin Dashboard</div>} />
-        <Route path="orders" element={<div className="p-4">Orders</div>} />
-        <Route path="products" element={<div className="p-4">Products</div>} />
-        <Route path="*" element={<Navigate to="/admin" replace />} />
-      </Routes>
+    <div className="min-h-dvh flex">
+      {/* Sidebar */}
+      <aside className="w-56 border-r bg-card shrink-0 hidden md:flex flex-col">
+        <div className="p-4 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+              O
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Orgonite Admin</p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-2 space-y-1">
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-left transition-colors ${
+                isActive(item.path)
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <span>{item.icon}</span>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-3 border-t">
+          <button
+            onClick={() => { logout(); navigate("/admin"); }}
+            className="w-full text-sm text-muted-foreground hover:text-destructive text-left px-3 py-2"
+          >
+            Deconnexion
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b px-4 py-3 flex items-center gap-2">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+          O
+        </div>
+        <div className="flex-1 text-sm font-semibold">Orgonite Admin</div>
+        <select
+          onChange={(e) => navigate(e.target.value)}
+          value={location.pathname}
+          className="text-sm border rounded px-2 py-1"
+        >
+          {NAV_ITEMS.map((item) => (
+            <option key={item.path} value={item.path}>
+              {item.icon} {item.label}
+            </option>
+          ))}
+        </select>
+        <button onClick={logout} className="text-xs text-muted-foreground">
+          Exit
+        </button>
+      </div>
+
+      {/* Main content */}
+      <main className="flex-1 overflow-y-auto md:pt-0 pt-14">
+        <div className="p-4 md:p-6 max-w-6xl mx-auto">
+          <Routes>
+            <Route index element={<DashboardPage />} />
+            <Route path="orders" element={<OrdersPage />} />
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="services" element={<ServicesPage />} />
+            <Route path="config" element={<ConfigPage />} />
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Routes>
+        </div>
+      </main>
     </div>
   );
 }
