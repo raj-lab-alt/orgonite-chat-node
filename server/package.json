@@ -12,7 +12,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@orgonite/shared": "*",
     "@supabase/supabase-js": "^2.49.4",
     "@types/multer": "^2.1.0",
     "cors": "^2.8.5",
