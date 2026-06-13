@@ -9,8 +9,18 @@ if (!fs.existsSync(source)) {
   throw new Error(`Legacy client source not found: ${source}`);
 }
 
-fs.rmSync(target, { recursive: true, force: true });
-fs.mkdirSync(target, { recursive: true });
-fs.cpSync(source, target, { recursive: true });
+if (!fs.existsSync(target)) {
+  fs.mkdirSync(target, { recursive: true });
+}
 
-console.log(`Copied legacy client from ${source} to ${target}`);
+const entries = fs.readdirSync(source, { withFileTypes: true });
+for (const entry of entries) {
+  if (entry.name === "index.html") continue;
+  const srcPath = path.join(source, entry.name);
+  const dstPath = path.join(target, entry.name);
+  if (entry.isDirectory()) {
+    fs.cpSync(srcPath, dstPath, { recursive: true });
+  } else {
+    fs.cpSync(srcPath, dstPath);
+  }
+}

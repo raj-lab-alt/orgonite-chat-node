@@ -4,7 +4,7 @@
   "main": "server.js",
   "scripts": {
     "dev": "concurrently -k -n server,client -c blue,green \"npx tsx watch server/src/index.ts\" \"npm --prefix client run dev\"",
-    "build": "node scripts/build-legacy-client.cjs && npx tsc -p server/tsconfig.json",
+    "build": "npm --prefix client run build && node scripts/build-legacy-client.cjs && npx tsc -p server/tsconfig.json",
     "start": "node server.js",
     "typecheck": "npx tsc --noEmit -p server/tsconfig.json && npx tsc --noEmit -p packages/shared/tsconfig.json",
     "test": "npx vitest run --passWithNoTests --root server"
