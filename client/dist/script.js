@@ -499,8 +499,11 @@ function normalizeForMatch(value) {
   return String(value || '')
     .toLowerCase()
     .normalize('NFD')
+    .replace(/[œŒ]/g, 'oe')
+    .replace(/[æÆ]/g, 'ae')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[™®©]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -783,9 +786,13 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
   const apiProductIds = Array.isArray(apiProducts)
     ? apiProducts.map(p => p && (p.id || p.slug)).filter(Boolean)
     : [];
-  const productIdsToRender = [...new Set([...extractedIds, ...apiProductIds])];
 
   let cleanedText = cleanBotText(apiResponseText);
+  const inferredProducts = apiProductIds.length || extractedIds.length
+    ? []
+    : inferProductsFromText(cleanedText);
+  const inferredProductIds = inferredProducts.map(p => p.id || p.slug).filter(Boolean);
+  const productIdsToRender = [...new Set([...extractedIds, ...apiProductIds, ...inferredProductIds])];
   let formattedHtml = formatChatText(cleanedText);
 
   const messageBubble = document.createElement('div');
@@ -817,7 +824,8 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
       productIdsToRender.forEach((id, i) => {
         setTimeout(() => {
           const apiProduct = Array.isArray(apiProducts) ? apiProducts.find(p => p && (p.id === id || p.slug === id)) : null;
-          const product = apiProduct || productCatalog.find(p => p.id === id || p.slug === id);
+          const inferredProduct = inferredProducts.find(p => p && (p.id === id || p.slug === id));
+          const product = apiProduct || inferredProduct || productCatalog.find(p => p.id === id || p.slug === id);
           if (!product) return;
           messagesEl.insertBefore(renderProductCardWithButtons(product), anchor);
           scrollChatToBottom('smooth', true);
@@ -825,6 +833,45 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
       });
     }
   }, remaining);
+}
+
+function inferProductsFromText(text) {
+  const normalizedText = normalizeForMatch(text);
+  if (!normalizedText || !Array.isArray(productCatalog) || !productCatalog.length) return [];
+
+  const aliasesById = {
+    orgonite_islamique: ['protection islamique', 'orgonite islamique', 'baraka', 'verset', 'coran', 'mauvais oeil islamique'],
+    orgonite_anti_ondes: ['anti ondes', 'anti onde', 'ondes electromagnetiques', 'wifi', 'wi fi', '4g', '5g', 'sommeil', 'emf'],
+    coeur_rose_amour: ['quartz rose', 'coeur rose', 'collier coeur quartz rose', 'collier quartz rose', 'collier amour', 'amour', 'relation', 'couple', 'blocages affectifs', 'energie du coeur'],
+    dome_abondance: ['abondance', 'prosperite', 'argent', 'opportunite', 'fluidite', 'dome abondance'],
+    cone_voiture: ['voiture', 'vehicule', 'route', 'conduite', 'cone voiture', 'orgonite voiture'],
+    orgonite_perso: ['personnalisee', 'personnalise', 'sur mesure', 'astrologique', 'numerologique', 'profil vibratoire'],
+    orgonedisc_recharge: ['orgondisc', 'fleur de vie', 'recharge', 'recharger', 'purifie', 'bracelet', 'cristaux'],
+    coeur_amethyste: ['amethyste', 'clarte mentale', 'serenite', 'equilibre emotionnel', 'collier violet'],
+    coeur_vert_protection: ['collier protection', 'collier de protection', 'coeur vert', 'collier vert', 'protection', 'proteger', 'bouclier', 'mauvais oeil', 'fatigue', 'stress', 'energies lourdes']
+  };
+
+  let best = null;
+  productCatalog.forEach(product => {
+    const generatedAliases = [
+      String(product.id || '').replace(/_/g, ' '),
+      product.slug || '',
+      product.name || '',
+      String(product.name || '').replace(/\b(royale|royal|tm)\b/gi, '')
+    ];
+    const configuredAliases = aliasesById[product.id] || [];
+    [...generatedAliases, ...configuredAliases]
+      .map(normalizeForMatch)
+      .filter(alias => alias.length >= 4)
+      .forEach(alias => {
+        if (!normalizedText.includes(alias)) return;
+        const configured = configuredAliases.map(normalizeForMatch).includes(alias);
+        const score = alias.length + (configured ? 40 : 0);
+        if (!best || score > best.score) best = { product, score };
+      });
+  });
+
+  return best ? [best.product] : [];
 }
 
 function showTyping() {

@@ -284,29 +284,16 @@ function inferProductFromContext(replyText, dbProducts, options) {
         if (byId)
             return byId;
     }
-    const text = normalizeOrderText(`${options.userMessage || ""} ${replyText}`);
+    const text = normalizeProductMatchText(`${options.userMessage || ""} ${replyText}`);
     const exactName = dbProducts.find((p) => {
-        const normalizedName = normalizeOrderText(p.name || "");
+        const normalizedName = normalizeProductMatchText(p.name || "");
         return normalizedName.length > 4 && text.includes(normalizedName);
     });
     if (exactName)
         return exactName;
-    const idPreference = [
-        [/islam|baraka|verset|coran|mauvais oeil spirituel/, "orgonite_islamique"],
-        [/amour|relation|couple|coeur|rose/, "coeur_rose_amour"],
-        [/abondance|argent|opportunite|prosperite|fluidite/, "dome_abondance"],
-        [/onde|wifi|wi-fi|4g|5g|electromagnetique|sommeil/, "orgonite_anti_ondes"],
-        [/voiture|vehicule|conduite|route/, "cone_voiture"],
-        [/personnalise|sur mesure|astrolog|numerolog|unique/, "orgonite_perso"],
-        [/protection|proteger|bouclier|mauvais oeil|fatigue|stress|energie lourde/, "coeur_vert_protection"],
-    ];
-    for (const [pattern, id] of idPreference) {
-        if (pattern.test(text)) {
-            const product = dbProducts.find((p) => p.id === id);
-            if (product)
-                return product;
-        }
-    }
+    const aliasProduct = inferProductByAlias(text, dbProducts);
+    if (aliasProduct)
+        return aliasProduct;
     const requestedType = options.productType && options.productType !== "general"
         ? options.productType
         : null;
@@ -316,5 +303,69 @@ function inferProductFromContext(replyText, dbProducts, options) {
             return byType;
     }
     return null;
+}
+function normalizeProductMatchText(value) {
+    return normalizeOrderText(String(value || "")
+        .replace(/[œŒ]/g, "oe")
+        .replace(/[æÆ]/g, "ae")
+        .replace(/[™®©]/g, " "))
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+function inferProductByAlias(normalizedText, dbProducts) {
+    const aliasesById = {
+        orgonite_islamique: [
+            "protection islamique", "orgonite islamique", "baraka", "verset", "coran", "mauvais oeil islamique",
+        ],
+        orgonite_anti_ondes: [
+            "anti ondes", "anti onde", "ondes electromagnetiques", "wifi", "wi fi", "4g", "5g", "sommeil", "emf",
+        ],
+        coeur_rose_amour: [
+            "quartz rose", "coeur rose", "collier coeur quartz rose", "collier quartz rose", "collier amour",
+            "amour", "relation", "couple", "blocages affectifs", "energie du coeur",
+        ],
+        dome_abondance: [
+            "abondance", "prosperite", "argent", "opportunite", "fluidite", "dome abondance",
+        ],
+        cone_voiture: [
+            "voiture", "vehicule", "route", "conduite", "cone voiture", "orgonite voiture",
+        ],
+        orgonite_perso: [
+            "personnalisee", "personnalise", "sur mesure", "astrologique", "numerologique", "profil vibratoire",
+        ],
+        orgonedisc_recharge: [
+            "orgondisc", "fleur de vie", "recharge", "recharger", "purifie", "bracelet", "cristaux",
+        ],
+        coeur_amethyste: [
+            "amethyste", "clarte mentale", "serenite", "equilibre emotionnel", "collier violet",
+        ],
+        coeur_vert_protection: [
+            "collier protection", "collier de protection", "coeur vert", "collier vert", "protection",
+            "proteger", "bouclier", "mauvais oeil", "fatigue", "stress", "energies lourdes",
+        ],
+    };
+    let best = null;
+    for (const product of dbProducts) {
+        const productId = String(product.id || "");
+        const generatedAliases = [
+            productId.replace(/_/g, " "),
+            product.slug,
+            product.name,
+            String(product.name || "").replace(/\b(royale|royal|tm)\b/gi, ""),
+        ];
+        const configuredAliases = aliasesById[productId] || [];
+        const aliases = [...generatedAliases, ...configuredAliases]
+            .map(normalizeProductMatchText)
+            .filter((alias) => alias.length >= 4);
+        for (const alias of aliases) {
+            if (!normalizedText.includes(alias))
+                continue;
+            const score = alias.length + (configuredAliases.map(normalizeProductMatchText).includes(alias) ? 40 : 0);
+            if (!best || score > best.score)
+                best = { product, score };
+        }
+    }
+    return best?.product || null;
 }
 //# sourceMappingURL=orders.js.map
