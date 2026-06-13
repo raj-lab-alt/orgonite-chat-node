@@ -56,13 +56,7 @@ La reponse visible doit contenir uniquement le message naturel destine au client
     const productRenderingAddendum = `
 
 [AFFICHAGE PRODUIT - REGLE OBLIGATOIRE]
-1. OBLIGATION DE BALISE : Chaque fois que tu presentes ou conseilles un produit du catalogue, ecris [RENDER_PRODUCT:id] dans ta reponse. Exemple : [RENDER_PRODUCT:coeur_amethyste].
-
-2. INTERDICTION STRICTE D'INVENTION : Ne decris JAMAIS un produit qui n'est pas liste dans [CATALOGUE PRODUITS]. Tu n'as le droit de parler que des produits presents dans cette liste.
-
-3. SI LE PROSPECT DEMANDE UN PRODUIT INEXISTANT : Ne l'invente pas. Trouve le produit le plus proche dans le catalogue et presente-le avec [RENDER_PRODUCT:id]. Exemple : "Nous avons un outil similaire : [RENDER_PRODUCT:orgonite_anti_ondes]".
-
-4. SI AUCUN PRODUIT NE CORRESPOND : Parle de maniere generale ("un outil de protection a base de pierres") sans inventer de nom, de prix, ni de description detaillee. N'utilise pas [RENDER_PRODUCT] sans un ID valide du catalogue.
+Chaque fois que tu presentes ou conseilles un produit du catalogue, ecris OBLIGATOIREMENT [RENDER_PRODUCT:id] dans ta reponse. Exemple : [RENDER_PRODUCT:coeur_amethyste]. Ne termine jamais une description produit sans cette balise.
 
 `;
     const manufacturingAddendum = `
@@ -78,7 +72,19 @@ N'utilise jamais un objet JSON imbrique "personnalisation" dans <ORDER>. Les cri
 Ces donnees sont indispensables pour fabriquer la piece. Si une seule manque, demande-la au client au lieu de creer la commande.
 `;
     const productTypePrompt = getProductTypePrompt(productType);
-    return prompt + languageAddendum + outputFormatAddendum + productRenderingAddendum + productTypePrompt + manufacturingAddendum;
+    const strictProhibitionAddendum = `
+
+[REGLES STRICTES - CATALOGUE SEULEMENT]
+1. TU N'AS LE DROIT DE PARLER QUE DES PRODUITS LISTES DANS [CATALOGUE PRODUITS]. N'invente JAMAIS un nom, un prix, une description, une pierre ou un bienfait qui ne vient pas du catalogue ci-dessus.
+
+2. Si le prospect demande un produit qui n'est pas dans le catalogue, trouve le produit catalogue le plus proche et presente-le avec [RENDER_PRODUCT:id].
+
+3. Si aucun produit catalogue ne correspond du tout, parle de maniere GENERALE seulement ("un outil de protection a base de pierres, de resine et de metaux"). N'invente PAS de nom, de prix, de composition, de taille ni de description detaillee.
+
+4. [RENDER_PRODUCT:id] ne doit JAMAIS etre utilise avec un id invente. Utilise uniquement un id depuis [CATALOGUE PRODUITS].
+
+`;
+    return strictProhibitionAddendum + prompt + languageAddendum + outputFormatAddendum + productRenderingAddendum + productTypePrompt + manufacturingAddendum;
 }
 function getProductTypePrompt(productType) {
     const map = {
