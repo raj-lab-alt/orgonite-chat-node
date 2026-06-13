@@ -1,3 +1,0 @@
-User-agent: *
-Allow: /
-Sitemap: https://assist.orgonite-tunisie.com/sitemap.xml
