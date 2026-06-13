@@ -1038,15 +1038,19 @@ function injectCodProductStyles() {
     .cod-product-page * { letter-spacing: 0; }
     .cod-hero {
       position: relative;
-      min-height: min(100dvh, 720px);
+      min-height: 0;
+      max-height: 340px;
       background: #08111d;
       display: flex;
       align-items: stretch;
+      overflow: hidden;
     }
     .cod-hero-img {
       width: 100%;
       aspect-ratio: 4 / 5;
-      min-height: min(100dvh, 720px);
+      height: auto;
+      min-height: 0;
+      max-height: 340px;
       object-fit: cover;
       display: block;
     }
@@ -1267,7 +1271,7 @@ function injectCodProductStyles() {
     .cod-form-commit { color: #A0A8B8; font-size: 12px; line-height: 1.55; margin: 12px 0; }
     @media (min-width: 680px) {
       .cod-product-page { width: min(100%, 560px); }
-      .cod-hero, .cod-hero-img { min-height: 680px; }
+      .cod-hero, .cod-hero-img { max-height: 440px; }
       .cod-section { padding: 22px; }
     }
 
@@ -1279,11 +1283,13 @@ function injectCodProductStyles() {
       animation: none;
     }
     .cod-product-page.is-fullpage .cod-hero {
-      min-height: min(100dvh, 640px);
+      min-height: 0;
+      max-height: 520px;
     }
     .cod-product-page.is-fullpage .cod-hero-img {
-      min-height: min(100dvh, 640px);
-      aspect-ratio: auto;
+      min-height: 0;
+      max-height: 520px;
+      aspect-ratio: 4 / 3;
     }
     .cod-product-page.is-fullpage .cod-hero-badges {
       top: 16px; left: 16px; right: 16px;
@@ -1394,6 +1400,7 @@ function injectCodProductStyles() {
     .chat-product-card img {
       width: 100%;
       aspect-ratio: 4 / 3;
+      max-height: 220px;
       object-fit: cover;
       display: block;
       background: #0f172a;

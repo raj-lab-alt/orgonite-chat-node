@@ -137,7 +137,9 @@ async function generateChatResult(
     userMessage: recentConversationText(history, message),
   });
 
-  return { reply, order: savedOrder, product: productData, products: productList };
+  const cleanFinalReply = reply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+
+  return { reply: cleanFinalReply, order: savedOrder, product: productData, products: productList };
 }
 
 async function handleChatSSE(

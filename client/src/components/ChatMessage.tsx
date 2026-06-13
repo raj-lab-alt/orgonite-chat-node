@@ -10,6 +10,7 @@ interface ChatMessageProps {
   product?: any;
   products?: any[];
   order?: any;
+  onOrderProduct?: (productName: string) => void;
 }
 
 export function ChatMessageBubble({
@@ -21,6 +22,7 @@ export function ChatMessageBubble({
   product,
   products,
   order,
+  onOrderProduct,
 }: ChatMessageProps) {
   const isUser = role === "user";
   const displayContent = cleanMessageContent(content);
@@ -88,7 +90,7 @@ export function ChatMessageBubble({
         {productCards.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {productCards.map((p: any) => (
-              <ProductCardBrief key={p.id} product={p} />
+              <MiniProductCard key={p.id} product={p} onOrder={onOrderProduct} />
             ))}
           </div>
         )}
@@ -97,40 +99,46 @@ export function ChatMessageBubble({
   );
 }
 
-function ProductCardBrief({ product }: { product: any }) {
+function MiniProductCard({ product, onOrder }: { product: any; onOrder?: (name: string) => void }) {
   const imageUrl = getProductImage(product);
   const name = product.name || "Produit";
   const price = product.price ?? product.prix ?? "";
   const currency = product.currency || "DT";
 
   return (
-    <div className="w-full min-w-0 rounded-lg bg-card border text-xs overflow-hidden">
-      <div className="flex gap-2 items-start">
-        {imageUrl && (
-          <img
-            src={imageUrl}
-            alt={name}
-            className="w-16 h-16 shrink-0 object-cover"
-          />
+    <div className="inline-flex items-stretch gap-0 rounded-lg border bg-card overflow-hidden max-w-[220px]">
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt={name}
+          className="w-14 h-14 shrink-0 object-cover"
+        />
+      )}
+      <div className="flex flex-col justify-between py-1.5 px-2 min-w-0 flex-1">
+        <p className="font-medium text-xs truncate leading-tight">{name}</p>
+        {price !== "" && (
+          <p className="text-xs font-semibold leading-tight">
+            {price} {currency}
+          </p>
         )}
-        <div className="flex-1 min-w-0 p-2">
-          <p className="font-medium text-sm truncate">{name}</p>
-          {product.benefits && (
-            <p className="text-muted-foreground line-clamp-2">{product.benefits}</p>
-          )}
-          {price !== "" && (
-            <p className="mt-1 font-semibold">
-              {price} {currency}
-            </p>
-          )}
-        </div>
+        {onOrder && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onOrder(name); }}
+            className="self-start mt-1 text-[10px] leading-tight bg-primary text-primary-foreground rounded px-1.5 py-0.5 hover:bg-primary/90 transition-colors"
+          >
+            Commander
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 function cleanMessageContent(content: string) {
-  return content.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+  return content
+    .replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "")
+    .replace(/<[^>]*>/g, "")
+    .trim();
 }
 
 function uniqueProducts(product?: any, products?: any[]) {

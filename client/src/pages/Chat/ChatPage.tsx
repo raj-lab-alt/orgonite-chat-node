@@ -3,7 +3,7 @@ import { useChatStore } from "@/stores/chat-store";
 import { ChatMessageBubble } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { AudioRecorder } from "@/components/AudioRecorder";
-import { sendMessage, sendVoiceMessage, fetchTracking } from "@/lib/api";
+import { sendMessage, sendVoiceMessage, fetchTracking, fetchProducts } from "@/lib/api";
 import type { ChatMessage } from "@/stores/chat-store";
 
 let msgIdCounter = 0;
@@ -20,6 +20,7 @@ export default function ChatPage() {
 
   const [showAudio, setShowAudio] = useState(false);
   const [welcomeMsg, setWelcomeMsg] = useState("");
+  const [welcomeProduct, setWelcomeProduct] = useState<any>(null);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -28,7 +29,13 @@ export default function ChatPage() {
     fetchTracking().then((data) => {
       if (data?.welcomeMessage) setWelcomeMsg(data.welcomeMessage);
     });
-  }, []);
+    if (productId) {
+      fetchProducts().then((products) => {
+        const p = products.find((p: any) => p.id === productId || p.slug === productId);
+        if (p) setWelcomeProduct(p);
+      });
+    }
+  }, [productId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,8 +64,11 @@ export default function ChatPage() {
         const assistantMsg: ChatMessage = {
           id: nextId(),
           role: "assistant",
-          content: welcomeMsg.replace(/<[^>]*>/g, ""),
+          content: welcomeMsg
+            .replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "")
+            .replace(/<[^>]*>/g, ""),
           timestamp: Date.now(),
+          product: welcomeProduct,
         };
         addMessage(assistantMsg);
       }
@@ -103,7 +113,14 @@ export default function ChatPage() {
         },
       });
     },
-    [mode, productId, productType, history, orderConfirmed, welcomeMsg, addMessage, setStreaming, appendStream, clearStream, setOrderConfirmed]
+    [mode, productId, productType, history, orderConfirmed, welcomeMsg, welcomeProduct, addMessage, setStreaming, appendStream, clearStream, setOrderConfirmed]
+  );
+
+  const handleOrderProduct = useCallback(
+    (productName: string) => {
+      handleSend(`Je veux commander ${productName}`);
+    },
+    [handleSend]
   );
 
   const handleVoiceRecorded = useCallback(
@@ -194,6 +211,7 @@ export default function ChatPage() {
             product={msg.product}
             products={msg.products}
             order={msg.order}
+            onOrderProduct={handleOrderProduct}
           />
         ))}
 
@@ -202,6 +220,7 @@ export default function ChatPage() {
             role="assistant"
             content={streamingContent}
             isStreaming
+            onOrderProduct={handleOrderProduct}
           />
         )}
 
