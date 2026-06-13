@@ -1378,6 +1378,60 @@ function injectCodProductStyles() {
       border-top: 1px solid rgba(140,110,255,0.06);
     }
     .cod-proof-bar strong { color: #22C55E; }
+
+    .chat-product-card {
+      width: min(100%, 360px);
+      align-self: flex-start;
+      margin: 4px 0 14px;
+      border-radius: 18px;
+      overflow: hidden;
+      background: rgba(18, 18, 32, 0.96);
+      border: 1px solid rgba(140, 110, 255, 0.18);
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.38);
+      color: #e2e8f0;
+      animation: cardSlideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .chat-product-card img {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      display: block;
+      background: #0f172a;
+    }
+    .chat-product-body {
+      padding: 13px 14px 14px;
+    }
+    .chat-product-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #f8fafc;
+      margin-bottom: 5px;
+    }
+    .chat-product-price {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #22c55e;
+      font-size: 18px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+    .chat-product-benefits {
+      color: #a0a8b8;
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .chat-product-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .chat-product-actions .cod-btn {
+      padding: 11px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -1510,7 +1564,29 @@ function renderRelatedProducts(current) {
 }
 
 function renderProductCardWithButtons(product) {
-  return renderCodProductPage(product, false);
+  return renderChatProductCardWithButtons(product);
+}
+
+function renderChatProductCardWithButtons(product) {
+  injectCodProductStyles();
+  const root = document.createElement('article');
+  const productId = product.id || product.slug || '';
+  const benefits = String(product.benefits || '').split('.').filter(Boolean).slice(0, 2).join('. ') || 'Un outil vibratoire a porter au quotidien.';
+  root.className = 'chat-product-card product-card';
+  root.dataset.productId = productId;
+  root.innerHTML = `
+    <img src="${escapeHtml(productImage(product))}" alt="${escapeHtml(product.name || 'Orgonite')}" loading="lazy">
+    <div class="chat-product-body">
+      <div class="chat-product-title">${escapeHtml(product.name || 'Orgonite')}</div>
+      <div class="chat-product-price">${money(product.price)}</div>
+      <div class="chat-product-benefits">${escapeHtml(benefits)}</div>
+      <div class="chat-product-actions">
+        <button class="cod-btn cod-btn-primary" type="button" onclick="chatAboutProduct('${escapeHtml(productId)}', 'commander')">Commander</button>
+        <button class="cod-btn cod-btn-secondary" type="button" onclick="chatAboutProduct('${escapeHtml(productId)}', 'question')">Poser une question</button>
+      </div>
+    </div>
+  `;
+  return root;
 }
 
 function chatAboutProduct(productId, action) {
