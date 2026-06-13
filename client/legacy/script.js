@@ -1386,7 +1386,7 @@ function injectCodProductStyles() {
     .cod-proof-bar strong { color: #22C55E; }
 
     .chat-product-card {
-      width: min(100%, 360px);
+      width: 100%; max-width: 360px;
       align-self: flex-start;
       margin: 4px 0 14px;
       border-radius: 18px;
@@ -1579,7 +1579,7 @@ function renderChatProductCardWithButtons(product) {
   const root = document.createElement('article');
   const productId = product.id || product.slug || '';
   const benefits = String(product.benefits || '').split('.').filter(Boolean).slice(0, 2).join('. ') || 'Un outil vibratoire a porter au quotidien.';
-  root.className = 'chat-product-card product-card';
+  root.className = 'chat-product-card';
   root.dataset.productId = productId;
   root.innerHTML = `
     <img src="${escapeHtml(productImage(product))}" alt="${escapeHtml(product.name || 'Orgonite')}" loading="lazy">
