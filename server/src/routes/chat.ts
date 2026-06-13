@@ -16,6 +16,7 @@ import {
 import { checkRateLimit } from "../services/rate-limit.js";
 import { getAppConfig } from "../lib/app-config.js";
 import { formatProduct } from "../lib/product-format.js";
+import { sanitizeAssistantReply } from "../lib/reply-sanitize.js";
 
 export const chatRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -112,7 +113,8 @@ async function generateChatResult(
     fullReply = "Desole, une erreur est survenue. Veuillez reessayer.";
   }
 
-  const { cleanReply, orderData } = detectOrderFromReply(fullReply);
+  const visibleReply = sanitizeAssistantReply(fullReply);
+  const { cleanReply, orderData } = detectOrderFromReply(visibleReply);
   let savedOrder = null;
 
   if (orderData) {
@@ -128,7 +130,7 @@ async function generateChatResult(
     }
   }
 
-  const reply = stripPrematureUpsell(cleanReply || fullReply, message, orderConfirmed, Boolean(savedOrder));
+  const reply = stripPrematureUpsell(cleanReply || visibleReply, message, orderConfirmed, Boolean(savedOrder));
   const { productData, productList } = detectProductsFromReply(reply, products, {
     productId,
     productType,

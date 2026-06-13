@@ -67,6 +67,14 @@ Interdit: ne reponds jamais en lettres latines si le prospect ecrit en lettres a
 
 `;
 
+  const outputFormatAddendum = `
+
+[FORMAT DE SORTIE - REGLE PRIORITAIRE]
+Ne montre jamais de JSON, d'objet d'analyse, de diagnostic interne, de champs comme lang/mode/intent/prenom/besoin/tel/doublon, ni de raisonnement technique au prospect.
+La reponse visible doit contenir uniquement le message naturel destine au client, plus les balises explicitement autorisees: [RENDER_PRODUCT:id] et <ORDER>{...}</ORDER> quand une commande complete doit etre creee.
+
+`;
+
   const productRenderingAddendum = `
 
 [AFFICHAGE PRODUIT - REGLE OBLIGATOIRE]
@@ -91,7 +99,7 @@ Ces donnees sont indispensables pour fabriquer la piece. Si une seule manque, de
 
   const productTypePrompt = getProductTypePrompt(productType);
 
-  return prompt + languageAddendum + productRenderingAddendum + productTypePrompt + manufacturingAddendum;
+  return prompt + languageAddendum + outputFormatAddendum + productRenderingAddendum + productTypePrompt + manufacturingAddendum;
 }
 
 function getProductTypePrompt(productType: string): string {

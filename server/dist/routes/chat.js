@@ -14,6 +14,7 @@ const orders_js_1 = require("../services/orders.js");
 const rate_limit_js_1 = require("../services/rate-limit.js");
 const app_config_js_1 = require("../lib/app-config.js");
 const product_format_js_1 = require("../lib/product-format.js");
+const reply_sanitize_js_1 = require("../lib/reply-sanitize.js");
 exports.chatRouter = (0, express_1.Router)();
 const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 async function getConfig() {
@@ -85,7 +86,8 @@ async function generateChatResult(message, extraFields, history, productId, conv
         console.error("Gemini chat error:", err.message);
         fullReply = "Desole, une erreur est survenue. Veuillez reessayer.";
     }
-    const { cleanReply, orderData } = (0, orders_js_1.detectOrderFromReply)(fullReply);
+    const visibleReply = (0, reply_sanitize_js_1.sanitizeAssistantReply)(fullReply);
+    const { cleanReply, orderData } = (0, orders_js_1.detectOrderFromReply)(visibleReply);
     let savedOrder = null;
     if (orderData) {
         const normalized = (0, orders_js_1.normalizeOrderPayload)(orderData);
@@ -98,7 +100,7 @@ async function generateChatResult(message, extraFields, history, productId, conv
             savedOrder = (0, orders_js_1.orderResponse)(saved.order, saved.created);
         }
     }
-    const reply = stripPrematureUpsell(cleanReply || fullReply, message, orderConfirmed, Boolean(savedOrder));
+    const reply = stripPrematureUpsell(cleanReply || visibleReply, message, orderConfirmed, Boolean(savedOrder));
     const { productData, productList } = (0, orders_js_1.detectProductsFromReply)(reply, products, {
         productId,
         productType,
