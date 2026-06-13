@@ -46,6 +46,14 @@ Reponds toujours dans la meme langue, le meme registre et le meme alphabet que l
 Interdit: ne reponds jamais en lettres latines si le prospect ecrit en lettres arabes.
 
 `;
+    const productRenderingAddendum = `
+
+[AFFICHAGE PRODUIT - REGLE OBLIGATOIRE]
+Quand tu recommandes, presentes ou cites un produit precis du catalogue, ajoute exactement son marqueur [RENDER_PRODUCT:id] une seule fois dans ta reponse.
+Exemple: pour le Collier Coeur Vert Royale, ajoute [RENDER_PRODUCT:coeur_vert_protection].
+N'invente jamais un id. Utilise uniquement les ids visibles dans [CATALOGUE PRODUITS].
+
+`;
     const manufacturingAddendum = `
 
 [DONNEES DE FABRICATION - ORGONITE PERSONNALISEE]
@@ -59,7 +67,7 @@ N'utilise jamais un objet JSON imbrique "personnalisation" dans <ORDER>. Les cri
 Ces donnees sont indispensables pour fabriquer la piece. Si une seule manque, demande-la au client au lieu de creer la commande.
 `;
     const productTypePrompt = getProductTypePrompt(productType);
-    return prompt + languageAddendum + productTypePrompt + manufacturingAddendum;
+    return prompt + languageAddendum + productRenderingAddendum + productTypePrompt + manufacturingAddendum;
 }
 function getProductTypePrompt(productType) {
     const map = {

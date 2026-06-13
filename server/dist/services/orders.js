@@ -251,7 +251,7 @@ function detectOrderFromReply(replyText) {
     }
     return { cleanReply: replyText, orderData: null };
 }
-function detectProductsFromReply(replyText, dbProducts) {
+function detectProductsFromReply(replyText, dbProducts, options = {}) {
     let productData = null;
     const productList = [];
     const productMatch = replyText.match(/\[RENDER_PRODUCT:(\w+)\]/);
@@ -267,6 +267,54 @@ function detectProductsFromReply(replyText, dbProducts) {
                 productList.push(p);
         }
     }
+    if (productList.length === 0) {
+        const fallback = inferProductFromContext(replyText, dbProducts, options);
+        if (fallback) {
+            productData = fallback;
+            productList.push(fallback);
+        }
+    }
     return { productData, productList };
+}
+function inferProductFromContext(replyText, dbProducts, options) {
+    if (!dbProducts.length)
+        return null;
+    if (options.productId) {
+        const byId = dbProducts.find((p) => p.id === options.productId || p.slug === options.productId);
+        if (byId)
+            return byId;
+    }
+    const text = normalizeOrderText(`${options.userMessage || ""} ${replyText}`);
+    const exactName = dbProducts.find((p) => {
+        const normalizedName = normalizeOrderText(p.name || "");
+        return normalizedName.length > 4 && text.includes(normalizedName);
+    });
+    if (exactName)
+        return exactName;
+    const idPreference = [
+        [/islam|baraka|verset|coran|mauvais oeil spirituel/, "orgonite_islamique"],
+        [/amour|relation|couple|coeur|rose/, "coeur_rose_amour"],
+        [/abondance|argent|opportunite|prosperite|fluidite/, "dome_abondance"],
+        [/onde|wifi|wi-fi|4g|5g|electromagnetique|sommeil/, "orgonite_anti_ondes"],
+        [/voiture|vehicule|conduite|route/, "cone_voiture"],
+        [/personnalise|sur mesure|astrolog|numerolog|unique/, "orgonite_perso"],
+        [/protection|proteger|bouclier|mauvais oeil|fatigue|stress|energie lourde/, "coeur_vert_protection"],
+    ];
+    for (const [pattern, id] of idPreference) {
+        if (pattern.test(text)) {
+            const product = dbProducts.find((p) => p.id === id);
+            if (product)
+                return product;
+        }
+    }
+    const requestedType = options.productType && options.productType !== "general"
+        ? options.productType
+        : null;
+    if (requestedType) {
+        const byType = dbProducts.find((p) => (p.product_type || p.productType) === requestedType);
+        if (byType)
+            return byType;
+    }
+    return null;
 }
 //# sourceMappingURL=orders.js.map

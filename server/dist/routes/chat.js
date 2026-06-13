@@ -68,7 +68,11 @@ async function generateChatResult(message, extraFields, history, productId, conv
         }
     }
     const reply = cleanReply || fullReply;
-    const { productData, productList } = (0, orders_js_1.detectProductsFromReply)(reply, products);
+    const { productData, productList } = (0, orders_js_1.detectProductsFromReply)(reply, products, {
+        productId,
+        productType,
+        userMessage: message,
+    });
     return { reply, order: savedOrder, product: productData, products: productList };
 }
 async function handleChatSSE(res, message, extraFields, history, productId, conversationMode, isVoice, productType) {

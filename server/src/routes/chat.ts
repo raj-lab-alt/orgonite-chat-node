@@ -93,7 +93,11 @@ async function generateChatResult(
   }
 
   const reply = cleanReply || fullReply;
-  const { productData, productList } = detectProductsFromReply(reply, products);
+  const { productData, productList } = detectProductsFromReply(reply, products, {
+    productId,
+    productType,
+    userMessage: message,
+  });
 
   return { reply, order: savedOrder, product: productData, products: productList };
 }

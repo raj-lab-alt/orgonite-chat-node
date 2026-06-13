@@ -72,7 +72,11 @@ export declare function detectProductsFromReply(replyText: string, dbProducts: {
     id: string;
     name: string;
     [key: string]: unknown;
-}[]): {
+}[], options?: {
+    productId?: string | null;
+    productType?: string;
+    userMessage?: string;
+}): {
     productData: unknown | null;
     productList: unknown[];
 };

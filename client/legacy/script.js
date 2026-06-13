@@ -780,6 +780,10 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
   while ((match = productRegex.exec(apiResponseText)) !== null) {
     extractedIds.push(match[1]);
   }
+  const apiProductIds = Array.isArray(apiProducts)
+    ? apiProducts.map(p => p && (p.id || p.slug)).filter(Boolean)
+    : [];
+  const productIdsToRender = [...new Set([...extractedIds, ...apiProductIds])];
 
   let cleanedText = cleanBotText(apiResponseText);
   let formattedHtml = formatChatText(cleanedText);
@@ -808,11 +812,12 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
     hideTyping();
     textContainer.innerHTML = formattedHtml;
     scrollChatToBottom('smooth', true);
-    if (extractedIds.length > 0) {
+    if (productIdsToRender.length > 0) {
       const delay = options.cardDelay || 600;
-      extractedIds.forEach((id, i) => {
+      productIdsToRender.forEach((id, i) => {
         setTimeout(() => {
-          const product = productCatalog.find(p => p.id === id);
+          const apiProduct = Array.isArray(apiProducts) ? apiProducts.find(p => p && (p.id === id || p.slug === id)) : null;
+          const product = apiProduct || productCatalog.find(p => p.id === id || p.slug === id);
           if (!product) return;
           messagesEl.insertBefore(renderProductCardWithButtons(product), anchor);
           scrollChatToBottom('smooth', true);
