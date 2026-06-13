@@ -137,7 +137,17 @@ async function generateChatResult(
     userMessage: recentConversationText(history, message),
   });
 
-  const cleanFinalReply = reply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+  let cleanFinalReply = reply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+
+  // Guard: if Gemini invented a product (no valid RENDER_PRODUCT tag found, but brackets with invented names remain)
+  if (productList.length === 0) {
+    // Strip invented [bracketed product names] that aren't markdown links
+    cleanFinalReply = cleanFinalReply
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\[[^\]]+\]/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
 
   return { reply: cleanFinalReply, order: savedOrder, product: productData, products: productList };
 }
