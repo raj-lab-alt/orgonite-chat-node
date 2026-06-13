@@ -5,6 +5,8 @@ interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
+  imageBase64?: string;
+  imageMimeType?: string;
   product?: any;
   products?: any[];
   order?: any;
@@ -14,36 +16,40 @@ export function ChatMessageBubble({
   role,
   content,
   isStreaming,
+  imageBase64,
+  imageMimeType,
   product,
   products,
   order,
 }: ChatMessageProps) {
   const isUser = role === "user";
-  const [displayed, setDisplayed] = useState(isUser ? content : "");
+  const displayContent = cleanMessageContent(content);
+  const [displayed, setDisplayed] = useState(isUser ? displayContent : "");
   const indexRef = useRef(0);
+  const productCards = uniqueProducts(product, products);
 
   useEffect(() => {
     if (isUser) {
-      setDisplayed(content);
+      setDisplayed(displayContent);
       return;
     }
 
     indexRef.current = 0;
     setDisplayed("");
 
-    if (!content) return;
+    if (!displayContent) return;
 
     const interval = setInterval(() => {
       indexRef.current++;
-      setDisplayed(content.slice(0, indexRef.current));
+      setDisplayed(displayContent.slice(0, indexRef.current));
 
-      if (indexRef.current >= content.length) {
+      if (indexRef.current >= displayContent.length) {
         clearInterval(interval);
       }
     }, 15);
 
     return () => clearInterval(interval);
-  }, [content, isUser]);
+  }, [displayContent, isUser]);
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
@@ -62,6 +68,14 @@ export function ChatMessageBubble({
           )}
         </p>
 
+        {imageBase64 && imageMimeType && (
+          <img
+            src={`data:${imageMimeType};base64,${imageBase64}`}
+            alt="Image jointe"
+            className="mt-2 max-h-64 w-full rounded-lg border object-contain bg-background"
+          />
+        )}
+
         {order && (
           <div className="mt-2 p-2 rounded-lg bg-primary/10 text-xs">
             <p className="font-semibold">Commande #{order.id}</p>
@@ -71,10 +85,9 @@ export function ChatMessageBubble({
           </div>
         )}
 
-        {product && <ProductCardBrief product={product} />}
-        {products && products.length > 0 && (
+        {productCards.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
-            {products.map((p: any) => (
+            {productCards.map((p: any) => (
               <ProductCardBrief key={p.id} product={p} />
             ))}
           </div>
@@ -85,23 +98,56 @@ export function ChatMessageBubble({
 }
 
 function ProductCardBrief({ product }: { product: any }) {
+  const imageUrl = getProductImage(product);
+  const name = product.name || "Produit";
+  const price = product.price ?? product.prix ?? "";
+  const currency = product.currency || "DT";
+
   return (
-    <div className="mt-2 p-2 rounded-lg bg-card border text-xs">
+    <div className="w-full min-w-0 rounded-lg bg-card border text-xs overflow-hidden">
       <div className="flex gap-2 items-start">
-        {product.imageUrl && (
+        {imageUrl && (
           <img
-            src={product.imageUrl}
-            alt={product.name}
-            className="w-12 h-12 rounded object-cover"
+            src={imageUrl}
+            alt={name}
+            className="w-16 h-16 shrink-0 object-cover"
           />
         )}
-        <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate">{product.name}</p>
-          <p className="text-muted-foreground">
-            {product.price} {product.currency}
-          </p>
+        <div className="flex-1 min-w-0 p-2">
+          <p className="font-medium text-sm truncate">{name}</p>
+          {product.benefits && (
+            <p className="text-muted-foreground line-clamp-2">{product.benefits}</p>
+          )}
+          {price !== "" && (
+            <p className="mt-1 font-semibold">
+              {price} {currency}
+            </p>
+          )}
         </div>
       </div>
     </div>
   );
+}
+
+function cleanMessageContent(content: string) {
+  return content.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+}
+
+function uniqueProducts(product?: any, products?: any[]) {
+  const list = [product, ...(products || [])].filter(Boolean);
+  const seen = new Set<string>();
+
+  return list.filter((item: any) => {
+    const key = String(item.id || item.slug || item.name || JSON.stringify(item));
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getProductImage(product: any) {
+  if (product.imageUrl) return product.imageUrl;
+  if (product.image_url) return product.image_url;
+  if (Array.isArray(product.images) && product.images.length > 0) return product.images[0];
+  return "";
 }

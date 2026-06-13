@@ -43,6 +43,8 @@ export default function ChatPage() {
         role: "user",
         content: text || "(image)",
         timestamp: Date.now(),
+        imageBase64,
+        imageMimeType,
       };
       addMessage(userMsg);
 
@@ -134,6 +136,8 @@ export default function ChatPage() {
             role: "assistant",
             content: data.reply || streamingContent,
             timestamp: Date.now(),
+            product: data.product,
+            products: data.products,
             order: data.order,
           };
           addMessage(assistantMsg);
@@ -185,6 +189,8 @@ export default function ChatPage() {
             key={msg.id}
             role={msg.role}
             content={msg.content}
+            imageBase64={msg.imageBase64}
+            imageMimeType={msg.imageMimeType}
             product={msg.product}
             products={msg.products}
             order={msg.order}

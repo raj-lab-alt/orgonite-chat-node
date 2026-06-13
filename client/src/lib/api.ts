@@ -124,7 +124,7 @@ export async function sendVoiceMessage(params: {
   conversationMode?: string;
   history?: string;
   onChunk: (text: string) => void;
-  onDone: (data: { reply: string; order?: any }) => void;
+  onDone: (data: { reply: string; order?: any; product?: any; products?: any[] }) => void;
   onError: (err: string) => void;
 }) {
   try {
@@ -168,7 +168,12 @@ export async function sendVoiceMessage(params: {
         try {
           const data = JSON.parse(jsonStr);
           if (data.done) {
-            params.onDone({ reply: data.reply || "", order: data.order });
+            params.onDone({
+              reply: data.reply || "",
+              order: data.order,
+              product: data.product,
+              products: data.products,
+            });
           } else if (data.text) {
             params.onChunk(data.text);
           }

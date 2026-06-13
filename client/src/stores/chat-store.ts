@@ -5,6 +5,8 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  imageBase64?: string;
+  imageMimeType?: string;
   product?: any;
   products?: any[];
   order?: any;
@@ -51,6 +53,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         {
           role: msg.role,
           text: msg.content,
+          imageBase64: msg.imageBase64,
+          imageMimeType: msg.imageMimeType,
           ...(msg.role === "user" && msg.content.startsWith("[MODE")
             ? { text: msg.content.replace(/\[MODE [ABC]\]\s*/, "") }
             : {}),

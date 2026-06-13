@@ -15,6 +15,7 @@ import {
 } from "../services/orders.js";
 import { checkRateLimit } from "../services/rate-limit.js";
 import { getAppConfig } from "../lib/app-config.js";
+import { formatProduct } from "../lib/product-format.js";
 
 export const chatRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -26,7 +27,7 @@ async function getConfig() {
   return {
     apiKeys: appConfig.geminiApiKeys,
     models: appConfig.geminiModels,
-    products,
+    products: products.map(formatProduct),
     statuses: appConfig.statuses,
     systemPrompt: appConfig.systemPrompt,
     catalogItemTemplate: appConfig.catalogItemTemplate,
@@ -47,6 +48,40 @@ interface ChatResult {
   products: any[];
 }
 
+function recentConversationText(history: any[], message: string) {
+  const historyText = history
+    .slice(-8)
+    .map((item) => item?.text || item?.content || "")
+    .filter(Boolean)
+    .join("\n");
+  return `${historyText}\n${message}`.trim();
+}
+
+function isAffirmationOnly(message: string) {
+  const normalized = message
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return /^(oui|ok|d accord|daccord|yes|yep|interesse|interessee|ca me parle|ça me parle|parle moi|montre moi)$/.test(normalized);
+}
+
+function stripPrematureUpsell(reply: string, message: string, orderConfirmed: boolean, hasOrder: boolean) {
+  if (orderConfirmed || hasOrder || !isAffirmationOnly(message)) return reply;
+  if (!/livraison offerte|2 outils|deux outils|economiser|économiser|cadeau protecteur|profiter/i.test(reply)) {
+    return reply;
+  }
+
+  const [beforeSeparator] = reply.split(/\n\s*---+\s*\n/);
+  const cleaned = beforeSeparator
+    .replace(/(?:^|\n).*livraison offerte[\s\S]*$/i, "")
+    .replace(/(?:^|\n).*2 outils[\s\S]*$/i, "")
+    .trim();
+
+  return cleaned || reply;
+}
+
 async function generateChatResult(
   message: string,
   extraFields: any,
@@ -55,6 +90,7 @@ async function generateChatResult(
   conversationMode: string,
   isVoice: boolean,
   productType: string,
+  orderConfirmed = false,
 ): Promise<ChatResult> {
   const { apiKeys, models, products, statuses, systemPrompt: dbSystemPrompt, catalogItemTemplate } = await getConfig();
   const catalog = catalogProducts(products);
@@ -92,11 +128,11 @@ async function generateChatResult(
     }
   }
 
-  const reply = cleanReply || fullReply;
+  const reply = stripPrematureUpsell(cleanReply || fullReply, message, orderConfirmed, Boolean(savedOrder));
   const { productData, productList } = detectProductsFromReply(reply, products, {
     productId,
     productType,
-    userMessage: message,
+    userMessage: recentConversationText(history, message),
   });
 
   return { reply, order: savedOrder, product: productData, products: productList };
@@ -111,6 +147,7 @@ async function handleChatSSE(
   conversationMode: string,
   isVoice: boolean,
   productType: string,
+  orderConfirmed = false,
 ) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -119,7 +156,7 @@ async function handleChatSSE(
   });
 
   const result = await generateChatResult(
-    message, extraFields, history, productId, conversationMode, isVoice, productType
+    message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed
   );
   res.write(`data: ${JSON.stringify({ text: result.reply })}\n\n`);
   res.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
@@ -160,12 +197,12 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
     const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
     if (wantsStream) {
-      await handleChatSSE(res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType);
+      await handleChatSSE(res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed);
       return;
     }
 
     const result = await generateChatResult(
-      message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType
+      message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed
     );
     res.json(result);
   } catch (err: any) {
@@ -203,12 +240,12 @@ chatRouter.post("/voice", upload.single("audio"), async (req: Request, res: Resp
     const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
     const wantsStream = req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
     if (wantsStream) {
-      await handleChatSSE(res, message, extraFields, history, productId, conversationMode, true, productType);
+      await handleChatSSE(res, message, extraFields, history, productId, conversationMode, true, productType, false);
       return;
     }
 
     const result = await generateChatResult(
-      message, extraFields, history, productId, conversationMode, true, productType
+      message, extraFields, history, productId, conversationMode, true, productType, false
     );
     res.json(result);
   } catch (err: any) {

@@ -5,6 +5,7 @@ const express_1 = require("express");
 const supabase_js_1 = require("../lib/supabase.js");
 const auth_js_1 = require("../middleware/auth.js");
 const legacy_config_js_1 = require("../lib/legacy-config.js");
+const product_format_js_1 = require("../lib/product-format.js");
 exports.productsRouter = (0, express_1.Router)();
 // Public: list visible products
 exports.productsRouter.get("/", async (_req, res) => {
@@ -21,7 +22,7 @@ exports.productsRouter.get("/", async (_req, res) => {
         });
         if (error)
             return res.status(500).json({ error: error.message });
-        res.json((data || []).map(formatProduct));
+        res.json((data || []).map(product_format_js_1.formatProduct));
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -36,7 +37,7 @@ exports.productsRouter.get("/admin", auth_js_1.requireAdmin, async (_req, res) =
             .order("created_at", { ascending: false });
         if (error)
             return res.status(500).json({ error: error.message });
-        res.json((data || []).map(formatProduct));
+        res.json((data || []).map(product_format_js_1.formatProduct));
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -213,42 +214,4 @@ exports.productsRouter.post("/sync", auth_js_1.requireAdmin, async (req, res) =>
         res.status(500).json({ error: err.message });
     }
 });
-function formatProduct(row) {
-    return {
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        price: parseFloat(row.price) || 0,
-        currency: row.currency || "DT",
-        imageUrl: row.image_url || row.imageUrl || "",
-        benefits: row.benefits || "",
-        composition: row.composition || "",
-        taille: row.taille || "",
-        accentColor: row.accent_color || row.accentColor || "#7c3aed",
-        productType: row.product_type || row.productType || "",
-        welcomeSequence: safeJsonParse(row.welcome_sequence ?? row.welcomeSequence, []),
-        stock: parseInt(row.stock) || 0,
-        hook: row.hook || "",
-        hookTransition: row.hook_transition || "",
-        upsellPrice: row.upsell_price || row.upsellPrice ? parseFloat(row.upsell_price ?? row.upsellPrice) : null,
-        priceOriginal: row.price_original || row.priceOriginal ? parseFloat(row.price_original ?? row.priceOriginal) : null,
-        faq: safeJsonParse(row.faq, []),
-        reviews: safeJsonParse(row.reviews, []),
-        visible: row.visible !== false,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-    };
-}
-function safeJsonParse(val, fallback) {
-    if (!val)
-        return fallback;
-    if (typeof val !== "string")
-        return val;
-    try {
-        return JSON.parse(val);
-    }
-    catch {
-        return fallback;
-    }
-}
 //# sourceMappingURL=products.js.map
