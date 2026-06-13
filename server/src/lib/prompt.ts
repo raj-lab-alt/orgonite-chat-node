@@ -78,9 +78,13 @@ La reponse visible doit contenir uniquement le message naturel destine au client
   const productRenderingAddendum = `
 
 [AFFICHAGE PRODUIT - REGLE OBLIGATOIRE]
-Quand tu recommandes, presentes ou cites un produit precis du catalogue, ajoute exactement son marqueur [RENDER_PRODUCT:id] une seule fois dans ta reponse.
-Exemple: pour le Collier Coeur Vert Royale, ajoute [RENDER_PRODUCT:coeur_vert_protection].
-N'invente jamais un id. Utilise uniquement les ids visibles dans [CATALOGUE PRODUITS].
+1. OBLIGATION DE BALISE : Chaque fois que tu presentes ou conseilles un produit du catalogue, ecris [RENDER_PRODUCT:id] dans ta reponse. Exemple : [RENDER_PRODUCT:coeur_amethyste].
+
+2. INTERDICTION STRICTE D'INVENTION : Ne decris JAMAIS un produit qui n'est pas liste dans [CATALOGUE PRODUITS]. Tu n'as le droit de parler que des produits presents dans cette liste.
+
+3. SI LE PROSPECT DEMANDE UN PRODUIT INEXISTANT : Ne l'invente pas. Trouve le produit le plus proche dans le catalogue et presente-le avec [RENDER_PRODUCT:id]. Exemple : "Nous avons un outil similaire : [RENDER_PRODUCT:orgonite_anti_ondes]".
+
+4. SI AUCUN PRODUIT NE CORRESPOND : Parle de maniere generale ("un outil de protection a base de pierres") sans inventer de nom, de prix, ni de description detaillee. N'utilise pas [RENDER_PRODUCT] sans un ID valide du catalogue.
 
 `;
 
