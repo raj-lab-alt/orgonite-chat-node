@@ -106,25 +106,25 @@ function MiniProductCard({ product, onOrder }: { product: any; onOrder?: (name: 
   const currency = product.currency || "DT";
 
   return (
-    <div className="inline-flex items-stretch gap-0 rounded-lg border border-primary/15 overflow-hidden bg-card max-w-[300px] animate-card-in">
+    <div className="inline-flex items-stretch gap-0 rounded-lg border bg-card overflow-hidden max-w-[220px]">
       {imageUrl && (
         <img
           src={imageUrl}
           alt={name}
-          className="w-24 h-24 shrink-0 object-cover aspect-square"
+          className="w-14 h-14 shrink-0 object-cover"
         />
       )}
-      <div className="flex flex-col justify-between p-3 min-w-0 flex-1">
-        <p className="font-medium text-sm truncate leading-snug">{name}</p>
+      <div className="flex flex-col justify-between py-1.5 px-2 min-w-0 flex-1">
+        <p className="font-medium text-xs truncate leading-tight">{name}</p>
         {price !== "" && (
-          <p className="text-sm font-bold text-primary leading-snug">
+          <p className="text-xs font-semibold leading-tight">
             {price} {currency}
           </p>
         )}
         {onOrder && (
           <button
             onClick={(e) => { e.stopPropagation(); onOrder(name); }}
-            className="self-start mt-1.5 text-[11px] font-medium leading-tight bg-primary text-primary-foreground rounded-md px-2 py-1 hover:bg-primary/90 transition-colors"
+            className="self-start mt-1 text-[10px] leading-tight bg-primary text-primary-foreground rounded px-1.5 py-0.5 hover:bg-primary/90 transition-colors"
           >
             Commander
           </button>
