@@ -109,6 +109,7 @@ Ces donnees sont indispensables pour fabriquer la piece. Si une seule manque, de
 4. [RENDER_PRODUCT:id] ne doit JAMAIS etre utilise avec un id invente. Utilise uniquement un id depuis [CATALOGUE PRODUITS].
 
 `;
+  console.log("[DEBUG prompt.ts] catalogItems.length:", catalogItems.length, "| prompt has CATALOG:", prompt.includes("{{CATALOG}}"), "| prompt has CATALOGUE PRODUITS:", prompt.includes("[CATALOGUE PRODUITS]"));
   return strictProhibitionAddendum + prompt + languageAddendum + outputFormatAddendum + productRenderingAddendum + productTypePrompt + manufacturingAddendum;
 }
 
