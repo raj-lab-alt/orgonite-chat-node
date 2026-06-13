@@ -21,10 +21,7 @@ exports.productsRouter.get("/", async (_req, res) => {
         });
         if (error)
             return res.status(500).json({ error: error.message });
-        const rows = data?.length
-            ? data
-            : (0, legacy_config_js_1.getLegacyProducts)().filter((p) => isAdminMount || p.visible !== false);
-        res.json(rows.map(formatProduct));
+        res.json((data || []).map(formatProduct));
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -39,8 +36,7 @@ exports.productsRouter.get("/admin", auth_js_1.requireAdmin, async (_req, res) =
             .order("created_at", { ascending: false });
         if (error)
             return res.status(500).json({ error: error.message });
-        const rows = data?.length ? data : (0, legacy_config_js_1.getLegacyProducts)();
-        res.json(rows.map(formatProduct));
+        res.json((data || []).map(formatProduct));
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -61,6 +57,7 @@ exports.productsRouter.post("/", auth_js_1.requireAdmin, async (req, res) => {
             currency: body.currency || "DT",
             image_url: body.imageUrl || "",
             benefits: body.benefits || "",
+            composition: body.composition || "",
             taille: body.taille || "",
             accent_color: body.accentColor || "#7c3aed",
             product_type: body.productType || "",
@@ -97,6 +94,7 @@ exports.productsRouter.put("/:id", auth_js_1.requireAdmin, async (req, res) => {
             currency: "currency",
             imageUrl: "image_url",
             benefits: "benefits",
+            composition: "composition",
             taille: "taille",
             accentColor: "accent_color",
             productType: "product_type",
@@ -181,6 +179,7 @@ exports.productsRouter.post("/sync", auth_js_1.requireAdmin, async (req, res) =>
                 currency: p.currency || "DT",
                 image_url: p.imageUrl || "",
                 benefits: p.benefits || "",
+                composition: p.composition || "",
                 taille: p.taille || "",
                 accent_color: p.accentColor || "#7c3aed",
                 product_type: p.productType || "",

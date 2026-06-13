@@ -4,7 +4,6 @@ exports.servicesRouter = void 0;
 const express_1 = require("express");
 const supabase_js_1 = require("../lib/supabase.js");
 const auth_js_1 = require("../middleware/auth.js");
-const legacy_config_js_1 = require("../lib/legacy-config.js");
 exports.servicesRouter = (0, express_1.Router)();
 // Public: list visible services
 exports.servicesRouter.get("/", async (_req, res) => {
@@ -21,10 +20,7 @@ exports.servicesRouter.get("/", async (_req, res) => {
         });
         if (error)
             return res.status(500).json({ error: error.message });
-        const rows = data?.length
-            ? data
-            : (0, legacy_config_js_1.getLegacyServices)().filter((s) => isAdminMount || s.visible !== false);
-        res.json(rows.map(formatService));
+        res.json((data || []).map(formatService));
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -39,8 +35,7 @@ exports.servicesRouter.get("/admin", auth_js_1.requireAdmin, async (_req, res) =
             .order("created_at", { ascending: false });
         if (error)
             return res.status(500).json({ error: error.message });
-        const rows = data?.length ? data : (0, legacy_config_js_1.getLegacyServices)();
-        res.json(rows.map(formatService));
+        res.json((data || []).map(formatService));
     }
     catch (err) {
         res.status(500).json({ error: err.message });

@@ -62,6 +62,90 @@ ordersRouter.get("/", requireAdmin, async (req: Request, res: Response) => {
   }
 });
 
+// Bulk operations must be declared before /:id routes.
+ordersRouter.put("/bulk-trash", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: "IDs requis" });
+
+    const { data: orders, error: selectError } = await supabase
+      .from("orders")
+      .select("id, statut")
+      .in("id", ids);
+
+    if (selectError) return res.status(500).json({ error: selectError.message });
+
+    const now = new Date().toISOString();
+    const updates = (orders || []).map((order) =>
+      supabase
+        .from("orders")
+        .update({
+          statut: "corbeille",
+          statut_avant_corbeille: order.statut || "attente de confirm tel",
+          trashed_at: now,
+          updated_at: now,
+        })
+        .eq("id", order.id)
+    );
+
+    const results = await Promise.all(updates);
+    const error = results.find((result) => result.error)?.error;
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.json({ success: true, count: orders?.length || 0 });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+ordersRouter.put("/bulk-restore", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: "IDs requis" });
+
+    const { data: orders, error: selectError } = await supabase
+      .from("orders")
+      .select("id, statut_avant_corbeille")
+      .in("id", ids);
+
+    if (selectError) return res.status(500).json({ error: selectError.message });
+
+    const now = new Date().toISOString();
+    const updates = (orders || []).map((order) =>
+      supabase
+        .from("orders")
+        .update({
+          statut: order.statut_avant_corbeille || "attente de confirm tel",
+          statut_avant_corbeille: null,
+          trashed_at: null,
+          updated_at: now,
+        })
+        .eq("id", order.id)
+    );
+
+    const results = await Promise.all(updates);
+    const error = results.find((result) => result.error)?.error;
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.json({ success: true, count: orders?.length || 0 });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+ordersRouter.delete("/bulk-delete", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!ids?.length) return res.status(400).json({ error: "IDs requis" });
+
+    const { error } = await supabase.from("orders").delete().in("id", ids);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, count: ids.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 ordersRouter.get("/:id", requireAdmin, async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
@@ -145,56 +229,6 @@ ordersRouter.put("/:id", requireAdmin, async (req: Request, res: Response) => {
 
     if (error) return res.status(500).json({ error: error.message });
     res.json(rowToOrder(data));
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Bulk operations
-ordersRouter.put("/bulk-trash", requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { ids } = req.body;
-    if (!ids?.length) return res.status(400).json({ error: "IDs requis" });
-
-    const now = new Date().toISOString();
-    const { error } = await supabase
-      .from("orders")
-      .update({ statut_avant_corbeille: "statut", trashed_at: now, updated_at: now } as any)
-      .in("id", ids);
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true, count: ids.length });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-ordersRouter.put("/bulk-restore", requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { ids } = req.body;
-    if (!ids?.length) return res.status(400).json({ error: "IDs requis" });
-
-    const now = new Date().toISOString();
-    const { error } = await supabase
-      .from("orders")
-      .update({ trashed_at: null, statut: supabase.rpc("coalesce", { "statut_avant_corbeille": "attente de confirm tel" }) as any, updated_at: now } as any)
-      .in("id", ids);
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true, count: ids.length });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-ordersRouter.delete("/bulk-delete", requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const { ids } = req.body;
-    if (!ids?.length) return res.status(400).json({ error: "IDs requis" });
-
-    const { error } = await supabase.from("orders").delete().in("id", ids);
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true, count: ids.length });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

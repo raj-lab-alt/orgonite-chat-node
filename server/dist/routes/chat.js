@@ -12,16 +12,11 @@ const prompt_js_1 = require("../lib/prompt.js");
 const gemini_js_1 = require("../services/gemini.js");
 const orders_js_1 = require("../services/orders.js");
 const rate_limit_js_1 = require("../services/rate-limit.js");
-const legacy_config_js_1 = require("../lib/legacy-config.js");
+const app_config_js_1 = require("../lib/app-config.js");
 exports.chatRouter = (0, express_1.Router)();
 const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-const DEFAULT_STATUSES = [
-    "attente de confirm tel", "cde double", "a expedier", "injoignable",
-    "confirmee att. env.", "livree", "echouee", "nn qualifiee", "Annulee",
-];
 async function getConfig() {
-    const apiKeys = (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean);
-    const models = (process.env.GEMINI_MODELS || "gemini-2.5-flash").split(",").filter(Boolean);
+    const appConfig = await (0, app_config_js_1.getAppConfig)();
     let products = [];
     try {
         const { data } = await supabase_js_1.supabase.from("products").select("*").eq("visible", true);
@@ -29,9 +24,14 @@ async function getConfig() {
             products = data;
     }
     catch { }
-    if (!products.length)
-        products = (0, legacy_config_js_1.getLegacyProducts)().filter((p) => p.visible !== false);
-    return { apiKeys, models, products };
+    return {
+        apiKeys: appConfig.geminiApiKeys,
+        models: appConfig.geminiModels,
+        products,
+        statuses: appConfig.statuses,
+        systemPrompt: appConfig.systemPrompt,
+        catalogItemTemplate: appConfig.catalogItemTemplate,
+    };
 }
 function catalogProducts(products) {
     return products.map((p) => ({
@@ -40,9 +40,9 @@ function catalogProducts(products) {
     }));
 }
 async function generateChatResult(message, extraFields, history, productId, conversationMode, isVoice, productType) {
-    const { apiKeys, models, products } = await getConfig();
+    const { apiKeys, models, products, statuses, systemPrompt: dbSystemPrompt, catalogItemTemplate } = await getConfig();
     const catalog = catalogProducts(products);
-    const systemPrompt = (0, prompt_js_1.getSystemPrompt)(catalog, undefined, undefined, productType);
+    const systemPrompt = (0, prompt_js_1.getSystemPrompt)(catalog, dbSystemPrompt, catalogItemTemplate, productType);
     let fullReply = "";
     try {
         const stream = (0, gemini_js_1.chatGeminiRequestStream)(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, models);
@@ -60,10 +60,10 @@ async function generateChatResult(message, extraFields, history, productId, conv
         const normalized = (0, orders_js_1.normalizeOrderPayload)(orderData);
         normalized.id = (0, orders_js_1.generateOrderId)();
         normalized.date = new Date().toISOString();
-        normalized.statut = DEFAULT_STATUSES[0];
+        normalized.statut = statuses[0];
         if (normalized.produit?.trim()) {
             (0, orders_js_1.applyOrderAmounts)(normalized, products.map((p) => ({ name: p.name, price: p.price, id: p.id })));
-            const saved = await (0, orders_js_1.saveOrderWithoutDuplicate)(normalized, DEFAULT_STATUSES, products.map((p) => ({ name: p.name, price: p.price, id: p.id })));
+            const saved = await (0, orders_js_1.saveOrderWithoutDuplicate)(normalized, statuses, products.map((p) => ({ name: p.name, price: p.price, id: p.id })));
             savedOrder = (0, orders_js_1.orderResponse)(saved.order, saved.created);
         }
     }

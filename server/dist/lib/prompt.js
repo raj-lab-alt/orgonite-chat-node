@@ -3,14 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getSystemPrompt = getSystemPrompt;
 const fs_1 = require("fs");
 const path_1 = require("path");
-const promptFilePath = (0, path_1.resolve)(__dirname, "../../prompt-amine-structure.txt");
+const promptFilePath = (0, path_1.resolve)(process.cwd(), "prompt-amine-structure.txt");
 function getSystemPrompt(catalogItems = [], systemPrompt, catalogTemplate, productType = "general") {
     let base = "";
-    if ((0, fs_1.existsSync)(promptFilePath)) {
-        base = (0, fs_1.readFileSync)(promptFilePath, "utf-8");
-    }
-    else if (systemPrompt) {
+    if (systemPrompt) {
         base = systemPrompt;
+    }
+    else if ((0, fs_1.existsSync)(promptFilePath)) {
+        base = (0, fs_1.readFileSync)(promptFilePath, "utf-8");
     }
     const tmpl = catalogTemplate ||
         "{n}. {name} [RENDER_PRODUCT:{id}] : {benefits} Composition : {composition}{taille} Taille : {taille}.{/taille} Prix : {price} {currency}.";

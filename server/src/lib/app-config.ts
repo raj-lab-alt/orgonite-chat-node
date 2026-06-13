@@ -41,7 +41,12 @@ function splitEnvList(value: string | undefined) {
 
 function asStringList(value: unknown, fallback: string[] = []) {
   if (!Array.isArray(value)) return fallback;
-  return value.map((item) => String(item).trim()).filter(Boolean);
+  const list = value.map((item) => String(item).trim()).filter(Boolean);
+  return list.length ? list : fallback;
+}
+
+function nonEmptyString(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
 }
 
 function readPromptFallback() {
@@ -71,9 +76,9 @@ function fallbackConfig(): AppConfig {
 
 function rowToConfig(row: any, fallback: AppConfig): AppConfig {
   return {
-    systemPrompt: row.system_prompt ?? fallback.systemPrompt,
-    catalogItemTemplate: row.catalog_item_template || fallback.catalogItemTemplate,
-    welcomeMessage: row.welcome_message ?? fallback.welcomeMessage,
+    systemPrompt: nonEmptyString(row.system_prompt, fallback.systemPrompt),
+    catalogItemTemplate: nonEmptyString(row.catalog_item_template, fallback.catalogItemTemplate),
+    welcomeMessage: nonEmptyString(row.welcome_message, fallback.welcomeMessage),
     facebookPixelIds: asStringList(row.facebook_pixel_ids, fallback.facebookPixelIds),
     googleAnalyticsIds: asStringList(row.google_analytics_ids, fallback.googleAnalyticsIds),
     statuses: asStringList(row.statuses, fallback.statuses),

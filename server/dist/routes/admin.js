@@ -38,8 +38,34 @@ const express_1 = require("express");
 const supabase_js_1 = require("../lib/supabase.js");
 const auth_js_1 = require("../middleware/auth.js");
 const admin_auth_js_1 = require("../lib/admin-auth.js");
-const legacy_config_js_1 = require("../lib/legacy-config.js");
+const app_config_js_1 = require("../lib/app-config.js");
 exports.adminRouter = (0, express_1.Router)();
+async function loadAdminProducts() {
+    const { data } = await supabase_js_1.supabase
+        .from("products")
+        .select("*")
+        .order("name");
+    return data || [];
+}
+async function buildConfigResponse() {
+    const [config, products] = await Promise.all([
+        (0, app_config_js_1.getAppConfig)(),
+        loadAdminProducts().catch(() => []),
+    ]);
+    return {
+        systemPrompt: config.systemPrompt,
+        _promptSource: config.source,
+        apiKeys: (0, app_config_js_1.maskApiKeys)(config.geminiApiKeys),
+        _apiKeyCount: config.geminiApiKeys.length,
+        models: config.geminiModels,
+        catalogItemTemplate: config.catalogItemTemplate,
+        welcomeMessage: config.welcomeMessage,
+        facebookPixelIds: config.facebookPixelIds,
+        googleAnalyticsIds: config.googleAnalyticsIds,
+        products,
+        statuses: config.statuses,
+    };
+}
 exports.adminRouter.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -75,54 +101,7 @@ exports.adminRouter.get("/check", auth_js_1.requireAdmin, (_req, res) => {
 });
 exports.adminRouter.get("/config", auth_js_1.requireAdmin, async (_req, res) => {
     try {
-        // Read system prompt from file
-        const fs = await Promise.resolve().then(() => __importStar(require("fs")));
-        const path = await Promise.resolve().then(() => __importStar(require("path")));
-        const promptFile = path.resolve(__dirname, "../../prompt-amine-structure.txt");
-        let systemPrompt = "";
-        let promptSource = "config";
-        if (fs.existsSync(promptFile)) {
-            systemPrompt = fs.readFileSync(promptFile, "utf-8");
-            promptSource = "file";
-        }
-        let products = [];
-        try {
-            const { data } = await supabase_js_1.supabase
-                .from("products")
-                .select("*")
-                .order("name");
-            products = data || [];
-        }
-        catch { }
-        const legacyConfig = (0, legacy_config_js_1.getLegacyConfig)();
-        const legacyStatuses = (0, legacy_config_js_1.getLegacyStatuses)();
-        res.json({
-            systemPrompt,
-            _promptSource: promptSource,
-            apiKeys: (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean).map(() => "***"),
-            _apiKeyCount: (process.env.GEMINI_API_KEYS || "").split(",").filter(Boolean).length,
-            models: (process.env.GEMINI_MODELS || "gemini-2.5-flash").split(",").filter(Boolean),
-            catalogItemTemplate: legacyConfig.catalogItemTemplate || "{n}. {name} [RENDER_PRODUCT:{id}] : {benefits} Composition : {composition} Prix : {price} {currency}.",
-            welcomeMessage: process.env.WELCOME_MESSAGE || legacyConfig.welcomeMessage || "",
-            facebookPixelIds: [process.env.FACEBOOK_PIXEL_ID].filter(Boolean).length
-                ? [process.env.FACEBOOK_PIXEL_ID].filter(Boolean)
-                : (legacyConfig.facebookPixelIds || []),
-            googleAnalyticsIds: [process.env.GA4_ID].filter(Boolean).length
-                ? [process.env.GA4_ID].filter(Boolean)
-                : (legacyConfig.googleAnalyticsIds || []),
-            products: products.length ? products : (0, legacy_config_js_1.getLegacyProducts)(),
-            statuses: legacyStatuses.length ? legacyStatuses : [
-                "attente de confirm tel",
-                "cde double",
-                "a expedier",
-                "injoignable",
-                "confirmee att. env.",
-                "livree",
-                "echouee",
-                "nn qualifiee",
-                "Annulee",
-            ],
-        });
+        res.json(await buildConfigResponse());
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -131,15 +110,31 @@ exports.adminRouter.get("/config", auth_js_1.requireAdmin, async (_req, res) => 
 exports.adminRouter.put("/config", auth_js_1.requireAdmin, async (req, res) => {
     try {
         const body = req.body;
-        // If systemPrompt provided, write to prompt file
-        if (body.systemPrompt) {
-            const fs = await Promise.resolve().then(() => __importStar(require("fs")));
-            const path = await Promise.resolve().then(() => __importStar(require("path")));
-            const promptFile = path.resolve(__dirname, "../../prompt-amine-structure.txt");
-            fs.writeFileSync(promptFile, body.systemPrompt, "utf-8");
+        const update = {};
+        if (body.systemPrompt !== undefined)
+            update.systemPrompt = String(body.systemPrompt);
+        if (body.catalogItemTemplate !== undefined)
+            update.catalogItemTemplate = String(body.catalogItemTemplate);
+        if (body.welcomeMessage !== undefined)
+            update.welcomeMessage = String(body.welcomeMessage);
+        if (body.facebookPixelIds !== undefined)
+            update.facebookPixelIds = normalizeStringList(body.facebookPixelIds);
+        if (body.googleAnalyticsIds !== undefined)
+            update.googleAnalyticsIds = normalizeStringList(body.googleAnalyticsIds);
+        if (body.statuses !== undefined)
+            update.statuses = normalizeStringList(body.statuses);
+        if (body.apiKeys !== undefined)
+            update.geminiApiKeys = normalizeStringList(body.apiKeys);
+        if (body.models !== undefined)
+            update.geminiModels = normalizeStringList(body.models);
+        if (update.statuses?.length === 0) {
+            return res.status(400).json({ error: "Au moins un statut est requis" });
         }
-        // Statuses are stored in env or config table
-        res.json({ success: true });
+        if (update.geminiModels?.length === 0) {
+            return res.status(400).json({ error: "Au moins un modele Gemini est requis" });
+        }
+        await (0, app_config_js_1.updateAppConfig)(update);
+        res.json(await buildConfigResponse());
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -234,11 +229,15 @@ exports.adminRouter.post("/migrate-schema", auth_js_1.requireAdmin, async (_req,
     try {
         const fs = await Promise.resolve().then(() => __importStar(require("fs")));
         const path = await Promise.resolve().then(() => __importStar(require("path")));
-        const sqlPath = path.resolve(__dirname, "../../supabase/migrations/001_initial_schema.sql");
-        if (!fs.existsSync(sqlPath)) {
-            return res.status(404).json({ error: "Fichier migration introuvable" });
+        const migrationsDir = path.resolve(process.cwd(), "supabase/migrations");
+        if (!fs.existsSync(migrationsDir)) {
+            return res.status(404).json({ error: "Dossier migrations introuvable" });
         }
-        const sql = fs.readFileSync(sqlPath, "utf-8");
+        const sql = fs.readdirSync(migrationsDir)
+            .filter((file) => file.endsWith(".sql"))
+            .sort()
+            .map((file) => fs.readFileSync(path.join(migrationsDir, file), "utf-8"))
+            .join("\n\n");
         const mgmtToken = process.env.SUPABASE_MGMT_TOKEN;
         const ref = process.env.SUPABASE_REF;
         if (!mgmtToken || !ref) {
@@ -256,10 +255,15 @@ exports.adminRouter.post("/migrate-schema", auth_js_1.requireAdmin, async (_req,
             const text = await response.text();
             return res.status(500).json({ error: text });
         }
-        res.json({ success: true, message: "Migration executed" });
+        res.json({ success: true, message: "Migrations executed" });
     }
     catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+function normalizeStringList(value) {
+    if (!Array.isArray(value))
+        return [];
+    return value.map((item) => String(item).trim()).filter(Boolean);
+}
 //# sourceMappingURL=admin.js.map

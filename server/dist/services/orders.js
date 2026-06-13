@@ -96,6 +96,43 @@ function normalizeOrderText(str) {
         .toLowerCase()
         .trim();
 }
+function orderToRow(data) {
+    const row = {};
+    const fields = [
+        ["id", "id"],
+        ["nom", "nom"],
+        ["telephone", "telephone"],
+        ["telephone2", "telephone2"],
+        ["gouvernorat", "gouvernorat"],
+        ["adresse", "adresse"],
+        ["produit", "produit"],
+        ["prixProduit", "prix_produit"],
+        ["fraisLivraison", "frais_livraison"],
+        ["totalCommande", "total_commande"],
+        ["nombreArticles", "nombre_articles"],
+        ["formatPersonnalise", "format_personnalise"],
+        ["dateNaissance", "date_naissance"],
+        ["signeAstrologique", "signe_astrologique"],
+        ["cheminVie", "chemin_vie"],
+        ["nombreAme", "nombre_ame"],
+        ["nombrePersonnalite", "nombre_personnalite"],
+        ["compositionPersonnalisee", "composition_personnalisee"],
+        ["briefFabrication", "brief_fabrication"],
+        ["notes", "notes"],
+        ["statut", "statut"],
+        ["date", "date"],
+        ["updated_at", "updated_at"],
+    ];
+    for (const [source, target] of fields) {
+        const value = data[source];
+        if (value !== undefined)
+            row[target] = value;
+    }
+    if (typeof row.telephone === "string") {
+        row.telephone = normalizePhone(row.telephone);
+    }
+    return row;
+}
 async function saveOrderWithoutDuplicate(data, statuses, products) {
     data = normalizeOrderPayload(data);
     const replaceRequested = data.remplace_commande === "true";
@@ -133,11 +170,7 @@ async function saveOrderWithoutDuplicate(data, statuses, products) {
                     delete dataToSave.fusion_avec;
                     const { error } = await supabase_js_1.supabase
                         .from("orders")
-                        .update({
-                        ...dataToSave,
-                        id: existing.id,
-                        updated_at: now,
-                    })
+                        .update(orderToRow({ ...dataToSave, id: existing.id, updated_at: now }))
                         .eq("id", existing.id);
                     if (error)
                         throw error;
@@ -154,7 +187,7 @@ async function saveOrderWithoutDuplicate(data, statuses, products) {
     data.statut = data.statut || statuses[0];
     delete data.remplace_commande;
     delete data.fusion_avec;
-    const { error } = await supabase_js_1.supabase.from("orders").insert(data);
+    const { error } = await supabase_js_1.supabase.from("orders").insert(orderToRow(data));
     if (error)
         throw error;
     return { order: data, created: true };

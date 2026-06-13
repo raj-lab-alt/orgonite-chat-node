@@ -124,6 +124,46 @@ export function normalizeOrderText(str: string): string {
     .trim();
 }
 
+function orderToRow(data: OrderData): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  const fields: Array<[keyof OrderData | string, string]> = [
+    ["id", "id"],
+    ["nom", "nom"],
+    ["telephone", "telephone"],
+    ["telephone2", "telephone2"],
+    ["gouvernorat", "gouvernorat"],
+    ["adresse", "adresse"],
+    ["produit", "produit"],
+    ["prixProduit", "prix_produit"],
+    ["fraisLivraison", "frais_livraison"],
+    ["totalCommande", "total_commande"],
+    ["nombreArticles", "nombre_articles"],
+    ["formatPersonnalise", "format_personnalise"],
+    ["dateNaissance", "date_naissance"],
+    ["signeAstrologique", "signe_astrologique"],
+    ["cheminVie", "chemin_vie"],
+    ["nombreAme", "nombre_ame"],
+    ["nombrePersonnalite", "nombre_personnalite"],
+    ["compositionPersonnalisee", "composition_personnalisee"],
+    ["briefFabrication", "brief_fabrication"],
+    ["notes", "notes"],
+    ["statut", "statut"],
+    ["date", "date"],
+    ["updated_at", "updated_at"],
+  ];
+
+  for (const [source, target] of fields) {
+    const value = data[source];
+    if (value !== undefined) row[target] = value;
+  }
+
+  if (typeof row.telephone === "string") {
+    row.telephone = normalizePhone(row.telephone);
+  }
+
+  return row;
+}
+
 export async function saveOrderWithoutDuplicate(
   data: OrderData,
   statuses: string[],
@@ -175,11 +215,7 @@ export async function saveOrderWithoutDuplicate(
 
           const { error } = await supabase
             .from("orders")
-            .update({
-              ...dataToSave,
-              id: existing.id,
-              updated_at: now,
-            } as any)
+            .update(orderToRow({ ...dataToSave, id: existing.id, updated_at: now }) as any)
             .eq("id", existing.id);
 
           if (error) throw error;
@@ -200,7 +236,7 @@ export async function saveOrderWithoutDuplicate(
   delete data.remplace_commande;
   delete data.fusion_avec;
 
-  const { error } = await supabase.from("orders").insert(data as any);
+  const { error } = await supabase.from("orders").insert(orderToRow(data) as any);
   if (error) throw error;
 
   return { order: data, created: true };

@@ -1126,6 +1126,10 @@ async function showProductForm(productId) {
             <textarea class="config-textarea" id="pf-benefits" rows="3" style="min-height:70px">${escHtml(d.benefits)}</textarea>
           </div>
           <div style="grid-column:1/-1">
+            <div class="config-label">Composition</div>
+            <textarea class="config-textarea" id="pf-composition" rows="3" style="min-height:60px">${escHtml(d.composition || '')}</textarea>
+          </div>
+          <div style="grid-column:1/-1">
             <div class="config-label">Welcome Sequence (1 ligne = 1 message, 3 max)</div>
             <textarea class="config-textarea" id="pf-welcomeSequence" rows="3" style="min-height:60px">${escHtml(d.welcomeSequence)}</textarea>
           </div>
@@ -1162,6 +1166,7 @@ async function saveProductForm(existingId) {
     currency: document.getElementById('pf-currency')?.value?.trim() || 'DT',
     imageUrl: document.getElementById('pf-imageUrl')?.value?.trim() || '',
     benefits: document.getElementById('pf-benefits')?.value?.trim() || '',
+    composition: document.getElementById('pf-composition')?.value?.trim() || '',
     taille: document.getElementById('pf-taille')?.value?.trim() || '',
     accentColor: document.getElementById('pf-accentColor')?.value?.trim() || '#7c3aed',
     productType: document.getElementById('pf-productType')?.value?.trim() || '',
