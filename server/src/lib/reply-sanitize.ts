@@ -19,6 +19,7 @@ export function sanitizeAssistantReply(reply: string): string {
     const json = block.replace(/^```json\s*/i, "").replace(/\s*```$/i, "");
     return isDiagnosticJson(json) ? "" : block;
   });
+  cleaned = cleaned.replace(/---\s*INSTRUCTION STRICTE[^]*?(?=\[RENDER_PRODUCT|$)/gi, "").trim();
   return cleaned.trim();
 }
 

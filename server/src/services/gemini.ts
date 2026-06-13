@@ -184,9 +184,11 @@ export async function* chatGeminiRequestStream(
   }
 
   const modePrefix = `[MODE ${mode}] `;
+  const RENDER_REMINDER =
+    "\n\n---\nINSTRUCTION STRICTE : Chaque fois que tu presentes, conseilles ou mentionnes un produit du catalogue, tu dois OBLIGATOIREMENT ecrire [RENDER_PRODUCT:id] a la fin de ton message, sans espace apres les deux-points. Exemple : [RENDER_PRODUCT:coeur_amethyste]. Ne termine JAMAIS une description produit sans cette balise.";
   messages.push({
     role: "user",
-    text: modePrefix + message,
+    text: modePrefix + message + RENDER_REMINDER,
     ...(extraFields.imageBase64 && {
       imageBase64: extraFields.imageBase64,
       imageMimeType: extraFields.imageMimeType || "image/jpeg",
