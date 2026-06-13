@@ -709,6 +709,7 @@ async function renderConfig() {
 
     renderStatuses();
     updateWelcomePreview();
+    updateCatalogPreview();
 
   } catch (e) {
     if (e.message !== 'Session expirée') {
@@ -777,8 +778,13 @@ function collectProductsFromUI() {
 function updateCatalogPreview() {
   const el = document.getElementById('catalogPreview');
   if (!el) return;
-  const products = collectProductsFromUI();
+  const domProducts = collectProductsFromUI();
+  const products = domProducts.length ? domProducts : (configCache.products || []).map(normalizeConfigProduct);
   const tmpl = document.getElementById('configCatalogTemplate')?.value || "{n}. {name} [{id}] : {benefits}";
+  if (!products.length) {
+    el.textContent = 'Aucun produit dans la base.';
+    return;
+  }
   const lines = products.map((p, i) => {
     let line = tmpl
       .replace(/\{n\}/g, String(i + 1))
@@ -793,6 +799,19 @@ function updateCatalogPreview() {
     return line;
   });
   el.textContent = lines.join('\n');
+}
+
+function normalizeConfigProduct(p) {
+  return {
+    id: p.id || '',
+    name: p.name || '',
+    price: parseFloat(p.price) || 0,
+    currency: p.currency || 'DT',
+    imageUrl: p.imageUrl || p.image_url || '',
+    benefits: p.benefits || '',
+    composition: p.composition || '',
+    taille: p.taille || ''
+  };
 }
 
 async function saveSystemPrompt() {
@@ -932,6 +951,7 @@ function updateWelcomePreview() {
 
 document.addEventListener('input', (e) => {
   if (e.target.id === 'configWelcomeMessage') updateWelcomePreview();
+  if (e.target.id === 'configCatalogTemplate') updateCatalogPreview();
 });
 
 async function saveWelcomeMessage() {
