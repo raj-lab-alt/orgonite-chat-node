@@ -395,9 +395,15 @@ exports.chatRouter.get("/diag", async (_req, res) => {
     }
 });
 // POST /api/chat — text + optional image
+exports.chatRouter.post("/", (req, res) => {
+    (async () => {
+        try {
+            res.json({ ok: true, echo: req.body?.message || "" }); return;
+        } catch (e) { res.json({ ok: false, error: String(e) }); }
+    })();
+});
 exports.chatRouter.post("/", async (req, res) => {
     try {
-        res.json({ ok: true, echo: req.body?.message || "" }); return;
         await (0, rate_limit_js_1.checkRateLimit)(req.ip);
         const body = zod_1.z.object({
             message: zod_1.z.string().max(2000).default(""),
