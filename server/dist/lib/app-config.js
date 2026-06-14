@@ -37,6 +37,10 @@ function asStringList(value, fallback = []) {
 function nonEmptyString(value, fallback) {
     return typeof value === "string" && value.trim() ? value : fallback;
 }
+function validGeminiModels(models) {
+    const valid = models.filter((m) => /^gemini-/.test(m));
+    return valid.length > 0 ? valid : ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+}
 function readPromptFallback() {
     const promptFile = (0, path_1.resolve)(process.cwd(), "prompt-amine-structure.txt");
     if (!(0, fs_1.existsSync)(promptFile))
@@ -54,9 +58,7 @@ function fallbackConfig() {
         googleAnalyticsIds: asStringList(legacy.googleAnalyticsIds, splitEnvList(process.env.GA4_ID)),
         statuses: legacyStatuses.length ? legacyStatuses : exports.DEFAULT_STATUSES,
         geminiApiKeys: splitEnvList(process.env.GEMINI_API_KEYS),
-        geminiModels: splitEnvList(process.env.GEMINI_MODELS).length
-            ? splitEnvList(process.env.GEMINI_MODELS)
-            : ["gemini-2.5-flash"],
+        geminiModels: validGeminiModels(splitEnvList(process.env.GEMINI_MODELS)),
         source: "seed",
     };
 }
@@ -69,7 +71,7 @@ function rowToConfig(row, fallback) {
         googleAnalyticsIds: asStringList(row.google_analytics_ids, fallback.googleAnalyticsIds),
         statuses: asStringList(row.statuses, fallback.statuses),
         geminiApiKeys: asStringList(row.gemini_api_keys, fallback.geminiApiKeys),
-        geminiModels: asStringList(row.gemini_models, fallback.geminiModels),
+        geminiModels: validGeminiModels(asStringList(row.gemini_models, fallback.geminiModels)),
         source: "database",
     };
 }
