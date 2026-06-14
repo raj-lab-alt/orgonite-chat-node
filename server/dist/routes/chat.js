@@ -135,9 +135,23 @@ async function recordConversationStats(req, mode, result) {
     }
 }
 async function generateChatResult(message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed = false, renderedProductIds = []) {
-    const { apiKeys, models, products, statuses, systemPrompt: dbSystemPrompt, catalogItemTemplate } = await getConfig();
-    const catalog = catalogProducts(products);
-    const systemPrompt = (0, prompt_js_1.getSystemPrompt)(catalog, dbSystemPrompt, catalogItemTemplate, productType);
+    let apiKeys, models, products, statuses, dbSystemPrompt, catalogItemTemplate;
+    let catalog;
+    let systemPrompt;
+    try {
+        const config = await getConfig();
+        apiKeys = config.apiKeys;
+        models = config.models;
+        products = config.products;
+        statuses = config.statuses;
+        dbSystemPrompt = config.systemPrompt;
+        catalogItemTemplate = config.catalogItemTemplate;
+        catalog = catalogProducts(products);
+        systemPrompt = (0, prompt_js_1.getSystemPrompt)(catalog, dbSystemPrompt, catalogItemTemplate, productType);
+    }
+    catch {
+        return { reply: "Desole, une erreur est survenue. Veuillez reessayer.", order: null, product: null, products: [] };
+    }
     let fullReply = "";
     try {
         const stream = (0, gemini_js_1.chatGeminiRequestStream)(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, models);
@@ -201,16 +215,38 @@ async function generateChatResult(message, extraFields, history, productId, conv
     return { reply: cleanFinalReply, order: savedOrder, product: productData, products: productList };
 }
 async function handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed = false, renderedProductIds = []) {
-    res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-    });
+    try {
+        res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+        });
+    }
+    catch {
+        return;
+    }
     const reqAborted = () => req.destroyed;
-    const { apiKeys, models, products, statuses, systemPrompt: dbSystemPrompt, catalogItemTemplate } = await getConfig();
-    const catalog = catalogProducts(products);
-    const systemPrompt = (0, prompt_js_1.getSystemPrompt)(catalog, dbSystemPrompt, catalogItemTemplate, productType);
+    let apiKeys, models, products, statuses, dbSystemPrompt, catalogItemTemplate;
+    let catalog;
+    let systemPrompt;
+    try {
+        const config = await getConfig();
+        apiKeys = config.apiKeys;
+        models = config.models;
+        products = config.products;
+        statuses = config.statuses;
+        dbSystemPrompt = config.systemPrompt;
+        catalogItemTemplate = config.catalogItemTemplate;
+        catalog = catalogProducts(products);
+        systemPrompt = (0, prompt_js_1.getSystemPrompt)(catalog, dbSystemPrompt, catalogItemTemplate, productType);
+    }
+    catch (err) {
+        logger_js_1.logger.error("handleChatSSE config error", { error: err.message });
+        if (!res.writableEnded)
+            res.end();
+        return;
+    }
     // Phase 1: stream Gemini tokens immediately
     let fullReply = "";
     try {
@@ -232,58 +268,78 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
         }
     }
     // Phase 2: process order + products
-    const visibleReply = (0, reply_sanitize_js_1.sanitizeAssistantReply)(fullReply);
-    const { cleanReply, orderData } = (0, orders_js_1.detectOrderFromReply)(visibleReply);
+    let visibleReply = fullReply;
+    let cleanReply = fullReply;
+    let orderData = null;
     let savedOrder = null;
     let orderValidationReply = "";
-    if (orderData) {
-        const normalized = (0, orders_js_1.normalizeOrderPayload)(orderData);
-        normalized.id = (0, orders_js_1.generateOrderId)();
-        normalized.date = new Date().toISOString();
-        normalized.statut = statuses[0];
-        const missing = missingOrderFields(normalized);
-        if (missing.length > 0) {
-            logger_js_1.logger.warn(`Incomplete order ignored. Missing: ${missing.join(", ")}`);
-            orderValidationReply =
-                "Il me manque encore quelques informations pour enregistrer la commande : " +
-                    missing.join(", ") +
-                    ". Peux-tu me les envoyer ?";
-        }
-        else {
-            const productPriceRefs = products.map((p) => ({ name: p.name, price: p.price, id: p.id }));
-            (0, orders_js_1.applyOrderAmounts)(normalized, productPriceRefs);
-            const saved = await (0, orders_js_1.saveOrderWithoutDuplicate)(normalized, statuses, productPriceRefs);
-            savedOrder = (0, orders_js_1.orderResponse)(saved.order, saved.created);
-        }
-    }
-    const reply = stripPrematureUpsell(orderValidationReply || cleanReply || visibleReply, message, orderConfirmed, Boolean(savedOrder));
-    const { productData, productList } = (0, orders_js_1.detectProductsFromReply)(reply, products, {
-        productId,
-        productType,
-        userMessage: recentConversationText(history, message),
-    });
-    if (renderedProductIds.length > 0 && productList.length > 0) {
-        const mentionedIds = productNameInMessage(message, products);
-        const filtered = productList.filter((p) => !renderedProductIds.includes(p.id) || mentionedIds.has(p.id));
-        if (filtered.length !== productList.length) {
-            logger_js_1.logger.info(`filtered ${productList.length - filtered.length} already-rendered products`);
-            productList.splice(0, productList.length, ...filtered);
-        }
-    }
-    // Strip RENDER_PRODUCT tags from what the user sees (they were streamed with them)
+    let productData = null;
+    let productList = [];
     let replyForClient = fullReply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
-    if (productList.length === 0) {
-        replyForClient = replyForClient
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-            .replace(/\[[^\]]+\]/g, "")
-            .replace(/\s{2,}/g, " ")
-            .trim();
+    try {
+        visibleReply = (0, reply_sanitize_js_1.sanitizeAssistantReply)(fullReply);
+        const orderResult = (0, orders_js_1.detectOrderFromReply)(visibleReply);
+        cleanReply = orderResult.cleanReply;
+        orderData = orderResult.orderData;
+        if (orderData) {
+            const normalized = (0, orders_js_1.normalizeOrderPayload)(orderData);
+            normalized.id = (0, orders_js_1.generateOrderId)();
+            normalized.date = new Date().toISOString();
+            normalized.statut = statuses[0];
+            const missing = missingOrderFields(normalized);
+            if (missing.length > 0) {
+                logger_js_1.logger.warn(`Incomplete order ignored. Missing: ${missing.join(", ")}`);
+                orderValidationReply =
+                    "Il me manque encore quelques informations pour enregistrer la commande : " +
+                        missing.join(", ") +
+                        ". Peux-tu me les envoyer ?";
+            }
+            else {
+                const productPriceRefs = products.map((p) => ({ name: p.name, price: p.price, id: p.id }));
+                (0, orders_js_1.applyOrderAmounts)(normalized, productPriceRefs);
+                const saved = await (0, orders_js_1.saveOrderWithoutDuplicate)(normalized, statuses, productPriceRefs);
+                savedOrder = (0, orders_js_1.orderResponse)(saved.order, saved.created);
+            }
+        }
+        const reply = stripPrematureUpsell(orderValidationReply || cleanReply || visibleReply, message, orderConfirmed, Boolean(savedOrder));
+        const detected = (0, orders_js_1.detectProductsFromReply)(reply, products, {
+            productId,
+            productType,
+            userMessage: recentConversationText(history, message),
+        });
+        productData = detected.productData;
+        productList = detected.productList;
+        if (renderedProductIds.length > 0 && productList.length > 0) {
+            const mentionedIds = productNameInMessage(message, products);
+            const filtered = productList.filter((p) => !renderedProductIds.includes(p.id) || mentionedIds.has(p.id));
+            if (filtered.length !== productList.length) {
+                logger_js_1.logger.info(`filtered ${productList.length - filtered.length} already-rendered products`);
+                productList.splice(0, productList.length, ...filtered);
+            }
+        }
+        replyForClient = fullReply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+        if (productList.length === 0) {
+            replyForClient = replyForClient
+                .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+                .replace(/\[[^\]]+\]/g, "")
+                .replace(/\s{2,}/g, " ")
+                .trim();
+        }
     }
-    const result = { reply: replyForClient, order: savedOrder, product: productData, products: productList };
-    await recordConversationStats(req, conversationMode, result);
-    res.write(`data: ${JSON.stringify({ done: true, reply: result.reply, order: result.order, product: result.product, products: result.products })}\n\n`);
-    res.write("data: [DONE]\n\n");
-    res.end();
+    catch (err) {
+        logger_js_1.logger.error("handleChatSSE phase2 error", { error: err.message });
+    }
+    const result = { reply: replyForClient || fullReply, order: savedOrder, product: productData, products: productList };
+    try {
+        await recordConversationStats(req, conversationMode, result);
+    }
+    catch { /* stats are best-effort */ }
+    try {
+        res.write(`data: ${JSON.stringify({ done: true, reply: result.reply, order: result.order, product: result.product, products: result.products })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+    }
+    catch { /* client may have disconnected */ }
 }
 // POST /api/chat — text + optional image
 exports.chatRouter.post("/", async (req, res) => {
@@ -330,7 +386,9 @@ exports.chatRouter.post("/", async (req, res) => {
             });
         }
         logger_js_1.logger.error("Chat error", { error: (err instanceof Error ? err.message : String(err)) });
-        res.status(500).json({ error: "Erreur interne du serveur" });
+        if (!res.headersSent) {
+            res.status(500).json({ error: "Erreur interne du serveur" });
+        }
     }
 });
 // POST /api/chat/voice — audio message
@@ -376,7 +434,9 @@ exports.chatRouter.post("/voice", upload.single("audio"), async (req, res) => {
     }
     catch (err) {
         logger_js_1.logger.error("Voice chat error", { error: (err instanceof Error ? err.message : String(err)) });
-        res.status(500).json({ error: "Erreur interne du serveur" });
+        if (!res.headersSent) {
+            res.status(500).json({ error: "Erreur interne du serveur" });
+        }
     }
 });
 //# sourceMappingURL=chat.js.map
