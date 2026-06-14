@@ -25,8 +25,17 @@ export async function checkRateLimit(
   }
 
   if (!data?.allowed) {
+    const { data: rlData } = await supabase
+      .from("rate_limits")
+      .select("reset_at")
+      .eq("ip", ip)
+      .single();
+    const retryAfter = rlData?.reset_at
+      ? Math.max(1, Math.ceil((new Date(rlData.reset_at).getTime() - Date.now()) / 1000))
+      : windowSeconds;
     const err = new Error("Trop de requetes. Veuillez reessayer plus tard.");
     (err as any).statusCode = 429;
+    (err as any).retryAfter = retryAfter;
     throw err;
   }
 }
@@ -47,8 +56,10 @@ async function fallbackCheck(
 
     if (data) {
       if (data.count >= maxRequests) {
+        const retryAfter = Math.max(1, Math.ceil((new Date(data.reset_at).getTime() - Date.now()) / 1000));
         const err = new Error("Trop de requetes. Veuillez reessayer plus tard.");
         (err as any).statusCode = 429;
+        (err as any).retryAfter = retryAfter;
         throw err;
       }
       await supabase

@@ -46,7 +46,7 @@ export interface SendMessageParams {
   orderConfirmed?: boolean;
   onChunk: (text: string) => void;
   onDone: (data: { reply: string; order?: OrderData; product?: ProductData; products?: ProductData[] }) => void;
-  onError: (err: string) => void;
+  onError: (err: string, retryAfter?: number) => void;
   signal?: AbortSignal;
 }
 
@@ -84,7 +84,7 @@ async function trySSE(
   body: Record<string, any>,
   onChunk: (text: string) => void,
   onDone: (data: any) => void,
-  onError: (err: string) => void,
+  onError: (err: string, retryAfter?: number) => void,
   signal?: AbortSignal,
 ): Promise<boolean> {
   try {
@@ -169,7 +169,7 @@ async function trySSE(
 async function tryJSON(
   body: Record<string, any>,
   onDone: (data: any) => void,
-  onError: (err: string) => void,
+  onError: (err: string, retryAfter?: number) => void,
   signal?: AbortSignal,
 ): Promise<boolean> {
   try {
@@ -185,7 +185,7 @@ async function tryJSON(
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "Erreur serveur" }));
-      onError(err.error || `HTTP ${res.status}`);
+      onError(err.error || `HTTP ${res.status}`, err.retryAfter);
       return false;
     }
 

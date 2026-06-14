@@ -46,8 +46,11 @@ export default function ChatPage({ showProductHero = false, product: propProduct
   const [welcomeProduct, setWelcomeProduct] = useState<any>(null);
   const [welcomeDone, setWelcomeDone] = useState(false);
   const [error, setError] = useState("");
+  const [retryAfter, setRetryAfter] = useState(0);
   const [focusKey, setFocusKey] = useState(0);
   const [allProducts, setAllProducts] = useState<any[]>([]);
+  const lastTextRef = useRef("");
+  const lastExtraRef = useRef<{ imageBase64?: string; imageMimeType?: string }>({});
   const [allServices, setAllServices] = useState<any[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -89,12 +92,34 @@ export default function ChatPage({ showProductHero = false, product: propProduct
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
 
+  // Countdown + auto-retry on rate limit
+  useEffect(() => {
+    if (retryAfter <= 0) return;
+    const id = setTimeout(() => {
+      setRetryAfter(prev => {
+        const next = prev - 1;
+        if (next <= 0) {
+          const text = lastTextRef.current;
+          if (text) {
+            handleSend(text, lastExtraRef.current.imageBase64, lastExtraRef.current.imageMimeType);
+          }
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearTimeout(id);
+  }, [retryAfter]);
+
   const streamingRef = useRef(streamingContent);
   streamingRef.current = streamingContent;
 
   const handleSend = useCallback(
     (text: string, imageBase64?: string, imageMimeType?: string) => {
       setError("");
+      setRetryAfter(0);
+      lastTextRef.current = text;
+      lastExtraRef.current = { imageBase64, imageMimeType };
 
       const userMsg: ChatMessage = {
         id: nextId(),
@@ -166,8 +191,9 @@ export default function ChatPage({ showProductHero = false, product: propProduct
             setOrderConfirmed(true);
           }
         },
-        onError: (err) => {
+        onError: (err, retryAfter) => {
           setError(err);
+          if (retryAfter) setRetryAfter(retryAfter);
           setStreaming(false);
           clearStream();
         },
@@ -431,7 +457,9 @@ export default function ChatPage({ showProductHero = false, product: propProduct
           )}
 
           {error && (
-            <div className="text-center text-destructive text-xs py-2">{error}</div>
+            <div className="text-center text-destructive text-xs py-2">
+              {retryAfter > 0 ? `Trop de requetes. Nouvelle tentative dans ${retryAfter}s...` : error}
+            </div>
           )}
 
           <div ref={endRef} />
