@@ -153,7 +153,17 @@ let topModelIndex = 0;
 
 const MIN_SOLID_SAMPLES = 10;
 const KEY_COOLDOWN_MS = 5000;
+const KEY_MIN_INTERVAL_MS = 2000;
 const keyCooldowns = new Map<number, number>();
+const keyLastUsed = new Map<number, number>();
+
+async function waitKeyInterval(keyIndex: number): Promise<void> {
+  const lastUsed = keyLastUsed.get(keyIndex) || 0;
+  const elapsed = Date.now() - lastUsed;
+  if (elapsed < KEY_MIN_INTERVAL_MS) {
+    await new Promise(r => setTimeout(r, KEY_MIN_INTERVAL_MS - elapsed));
+  }
+}
 
 function getTopModels(models: string[]): string[] | null {
   const stats = getModelStats();
@@ -263,11 +273,13 @@ export async function* chatGeminiRequestStream(
     const keyIndex = pickKeyIndex(apiKeys.length);
     const apiKey = apiKeys[keyIndex];
 
+    await waitKeyInterval(keyIndex);
     const startTime = Date.now();
     let recorded = false;
     let stateBuf = '';      // accumulator for ETAT block (before -----)
     let streaming = false;  // true once ----- is found
     try {
+      keyLastUsed.set(keyIndex, Date.now());
       for await (const chunk of callGeminiStream(apiKey, model, contents, systemPrompt)) {
         if (!recorded) {
           recorded = true;

@@ -2,7 +2,7 @@ import { supabase } from "../lib/supabase.js";
 import { logger } from "../lib/logger.js";
 
 const WINDOW_SECONDS = 60;
-const MAX_REQUESTS = 10;
+const MAX_REQUESTS = 30;
 
 export async function checkRateLimit(
   identifier = "unknown",
