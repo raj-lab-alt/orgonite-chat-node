@@ -136,6 +136,12 @@ Valeurs possibles pour chaque champ :
 
 Le bloc [ETAT] est visible par le client. Ecris-le correctement formatted.
 
+REGLES STRICTES :
+- NE JAMAIS utiliser d'accolades {} dans le bloc [ETAT] ou [LANGUE].
+- Ecris lang=fr, PAS {lang}=fr.
+- Ecris mode=A, PAS {mode}=A.
+- Les accolades {} sont INTERDITES dans le tracking.
+
 `;
 
   return strictProhibitionAddendum + prompt + languageAddendum + etatTrackingAddendum + outputFormatAddendum + productRenderingAddendum + productTypePrompt + manufacturingAddendum;

@@ -181,6 +181,17 @@ function pickKeyIndex(apiKeysLength: number): number {
   return globalKeyIndex++ % apiKeysLength;
 }
 
+function sanitizeEtatOutput(text: string): string {
+  const lines = text.split('\n');
+  return lines.map(line => {
+    if (line.includes('[ETAT]') || line.includes('[LANGUE]')) {
+      line = line.replace(/\{(\w+)\}=/g, '$1=');
+      line = line.replace(/\{\s*/g, '');
+    }
+    return line;
+  }).join('\n');
+}
+
 export async function* chatGeminiRequestStream(
   message: string,
   extraFields: { imageBase64?: string | null; imageMimeType?: string | null; audioBase64?: string | null; audioMimeType?: string | null },
@@ -205,7 +216,10 @@ export async function* chatGeminiRequestStream(
   }
 
   const mode = (conversationMode || (productId === "orgonite_perso" ? "C" : productId ? "B" : "A")).toUpperCase();
-  const trimmedHistory = history.slice(0, 100);
+  const trimmedHistory = history.slice(0, 100).map(msg => ({
+    ...msg,
+    text: msg.text ? sanitizeEtatOutput(msg.text) : msg.text,
+  }));
   const messages: ChatMessage[] = [...trimmedHistory];
 
   // Mode A first message prevention
@@ -254,7 +268,7 @@ export async function* chatGeminiRequestStream(
             latencyMs: Date.now() - startTime,
           });
         }
-        yield chunk;
+        yield sanitizeEtatOutput(chunk);
       }
       if (!recorded) {
         // Stream completed without yielding — still a success (empty response)
