@@ -27,9 +27,10 @@ function collectRenderedProductIds(messages: ChatMessage[]) {
 
 interface ChatPageProps {
   showProductHero?: boolean;
+  product?: any;
 }
 
-export default function ChatPage({ showProductHero = false }: ChatPageProps) {
+export default function ChatPage({ showProductHero = false, product: propProduct }: ChatPageProps) {
   const {
     messages, isStreaming, streamingContent, mode, productId, productType,
     orderConfirmed, history, addMessage, setStreaming, appendStream,
@@ -292,25 +293,25 @@ export default function ChatPage({ showProductHero = false }: ChatPageProps) {
       </div>
 
       {/* Product Hero (org route) */}
-      {showProductHero && welcomeProduct && (
+      {showProductHero && (propProduct || welcomeProduct) && (
         <div className="shrink-0 border-b border-primary/10">
           <div className="flex gap-4 p-4 items-start">
-            {(welcomeProduct.imageUrl || welcomeProduct.image_url) && (
+            {((propProduct?.imageUrl || propProduct?.image_url) || (welcomeProduct?.imageUrl || welcomeProduct?.image_url)) && (
               <img
-                src={welcomeProduct.imageUrl || welcomeProduct.image_url}
-                alt={welcomeProduct.name || "Produit"}
+                src={(propProduct?.imageUrl || propProduct?.image_url) || (welcomeProduct?.imageUrl || welcomeProduct?.image_url)}
+                alt={propProduct?.name || welcomeProduct?.name || "Produit"}
                 className="w-24 h-24 rounded-xl object-cover shrink-0"
               />
             )}
             <div className="flex-1 min-w-0">
-              <h2 className="text-base font-bold text-foreground">{welcomeProduct.name || "Produit"}</h2>
-              {(welcomeProduct.price || welcomeProduct.prix) && (
+              <h2 className="text-base font-bold text-foreground">{propProduct?.name || welcomeProduct?.name || "Produit"}</h2>
+              {((propProduct?.price || propProduct?.prix) || (welcomeProduct?.price || welcomeProduct?.prix)) && (
                 <p className="text-lg font-bold text-primary mt-0.5">
-                  {welcomeProduct.price || welcomeProduct.prix} {welcomeProduct.currency || "DT"}
+                  {propProduct?.price || propProduct?.prix || welcomeProduct?.price || welcomeProduct?.prix} {propProduct?.currency || welcomeProduct?.currency || "DT"}
                 </p>
               )}
-              {welcomeProduct.description && (
-                <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">{welcomeProduct.description}</p>
+              {(propProduct?.description || welcomeProduct?.description) && (
+                <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">{propProduct?.description || welcomeProduct?.description}</p>
               )}
             </div>
           </div>

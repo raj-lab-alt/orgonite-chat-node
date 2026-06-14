@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useParams, Navigate } from "react-router-dom";
 import { useChatStore } from "@/stores/chat-store";
 import type { ProductData, ProductType } from "@/stores/chat-store";
 import { fetchProducts } from "@/lib/api";
@@ -9,20 +9,34 @@ export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
   const setProduct = useChatStore((s) => s.setProduct);
   const setMode = useChatStore((s) => s.setMode);
-  const done = useRef(false);
+  const [product, setLocalProduct] = useState<ProductData | null | false>(null);
 
   useEffect(() => {
-    if (!slug || done.current) return;
-    done.current = true;
+    if (!slug) return;
     fetchProducts().then((products: ProductData[]) => {
       const p = products.find((prod) => prod.slug === slug);
       if (p) {
+        setLocalProduct(p);
         const type = (p.productType || "general") as ProductType;
         setProduct(p.id, type);
         setMode(type === "custom" ? "C" : "B");
+      } else {
+        setLocalProduct(false);
       }
     });
   }, [slug]);
 
-  return <ChatPage showProductHero />;
+  if (product === null) {
+    return (
+      <div className="chat-container flex items-center justify-center h-dvh bg-background">
+        <p className="text-sm text-muted-foreground">Chargement...</p>
+      </div>
+    );
+  }
+
+  if (product === false) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <ChatPage showProductHero product={product} />;
 }
