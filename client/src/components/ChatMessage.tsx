@@ -37,26 +37,22 @@ export function ChatMessageBubble({
       return;
     }
 
-    if (isStreaming) {
-      setDisplayed(displayContent);
-      return;
+    if (!isStreaming) {
+      indexRef.current = 0;
+      setDisplayed("");
+
+      if (!displayContent) return;
+
+      const interval = setInterval(() => {
+        indexRef.current++;
+        setDisplayed(displayContent.slice(0, indexRef.current));
+        if (indexRef.current >= displayContent.length) {
+          clearInterval(interval);
+        }
+      }, 15);
+
+      return () => clearInterval(interval);
     }
-
-    indexRef.current = 0;
-    setDisplayed("");
-
-    if (!displayContent) return;
-
-    const interval = setInterval(() => {
-      indexRef.current++;
-      setDisplayed(displayContent.slice(0, indexRef.current));
-
-      if (indexRef.current >= displayContent.length) {
-        clearInterval(interval);
-      }
-    }, 15);
-
-    return () => clearInterval(interval);
   }, [displayContent, isUser, isStreaming]);
 
   return (
@@ -70,7 +66,7 @@ export function ChatMessageBubble({
         )}
       >
         <p className="whitespace-pre-wrap break-words">
-          {displayed}
+          {isStreaming ? displayContent : displayed}
           {isStreaming && (
             <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse" />
           )}
