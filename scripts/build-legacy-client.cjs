@@ -14,12 +14,19 @@ fs.cpSync(legacyDir, distDir, { recursive: true });
 console.log("✓ Legacy client copied to dist/");
 
 // 2. React build → dist-react/ (production, will be used if successful)
-try {
-  execSync("npx vite build --outDir dist-react", {
-    cwd: clientDir,
-    stdio: "pipe",
-  });
-  console.log("✓ React build succeeded (dist-react/)");
-} catch (err) {
-  console.log("⚠ React build failed, keeping legacy as fallback");
+const reactDist = path.join(clientDir, "dist-react");
+const reactIndex = path.join(reactDist, "index.html");
+
+if (fs.existsSync(reactIndex)) {
+  console.log("✓ React dist-react/ already exists (from git), skipping rebuild");
+} else {
+  try {
+    execSync("npx vite build --outDir dist-react", {
+      cwd: clientDir,
+      stdio: "pipe",
+    });
+    console.log("✓ React build succeeded (dist-react/)");
+  } catch (err) {
+    console.log("⚠ React build failed, keeping legacy as fallback");
+  }
 }

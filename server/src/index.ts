@@ -82,9 +82,13 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 // Prefer dist-react/ (React build), fall back to dist/ (legacy PHP)
 const reactDist = resolve(__dirname, "../../client/dist-react");
-const clientDist = existsSync(reactDist) ? reactDist : resolve(__dirname, "../../client/dist");
+const legacyDist = resolve(__dirname, "../../client/dist");
+const reactExists = existsSync(reactDist);
+const clientDist = reactExists ? reactDist : legacyDist;
 const adminHtml = resolve(clientDist, "admin.html");
 const adminExists = existsSync(adminHtml);
+
+console.log("[server] Serving from:", clientDist, "(reactBuild:", reactExists, ")");
 
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
