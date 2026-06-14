@@ -4,7 +4,7 @@ exports.checkRateLimit = checkRateLimit;
 const supabase_js_1 = require("../lib/supabase.js");
 const logger_js_1 = require("../lib/logger.js");
 const WINDOW_SECONDS = 60;
-const MAX_REQUESTS = 10;
+const MAX_REQUESTS = 30;
 async function checkRateLimit(identifier = "unknown", maxRequests = MAX_REQUESTS, windowSeconds = WINDOW_SECONDS) {
     const ip = String(identifier || "unknown").slice(0, 45);
     const { data, error } = await supabase_js_1.supabase.rpc("check_rate_limit", {
@@ -19,8 +19,17 @@ async function checkRateLimit(identifier = "unknown", maxRequests = MAX_REQUESTS
         return;
     }
     if (!data?.allowed) {
+        const { data: rlData } = await supabase_js_1.supabase
+            .from("rate_limits")
+            .select("reset_at")
+            .eq("ip", ip)
+            .single();
+        const retryAfter = rlData?.reset_at
+            ? Math.max(1, Math.ceil((new Date(rlData.reset_at).getTime() - Date.now()) / 1000))
+            : windowSeconds;
         const err = new Error("Trop de requetes. Veuillez reessayer plus tard.");
         err.statusCode = 429;
+        err.retryAfter = retryAfter;
         throw err;
     }
 }
@@ -34,8 +43,10 @@ async function fallbackCheck(ip, maxRequests, windowSeconds) {
             .single();
         if (data) {
             if (data.count >= maxRequests) {
+                const retryAfter = Math.max(1, Math.ceil((new Date(data.reset_at).getTime() - Date.now()) / 1000));
                 const err = new Error("Trop de requetes. Veuillez reessayer plus tard.");
                 err.statusCode = 429;
+                err.retryAfter = retryAfter;
                 throw err;
             }
             await supabase_js_1.supabase

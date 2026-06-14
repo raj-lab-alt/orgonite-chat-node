@@ -1,5 +1,6 @@
 import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
+import { stripInternalDiagnostics } from "../lib/reply-sanitize.js";
 import { recordAttempt, getModelStats } from "./gemini-stats.js";
 import { refreshModelList } from "./gemini-models.js";
 
@@ -200,11 +201,24 @@ function pickKeyIndex(apiKeysLength: number): number {
 }
 
 function sanitizeEtatOutput(text: string): string {
-  text = text.replace(/\{?\[ETAT\].*?(?:\n|$)/g, '');
-  text = text.replace(/\{?\[LANGUE\].*?(?:\n|$)/g, '');
+  text = stripInternalDiagnostics(text);
   text = text.replace(/\{(\w+)\}=/g, '$1=');
   text = text.replace(/\{\s*/g, '');
   return text;
+}
+
+function maybeDiagnosticPrefix(text: string): boolean {
+  const trimmed = text.trimStart().toUpperCase();
+  if (!trimmed) return true;
+
+  const markers = [
+    "[ETAT", "[ÉTAT", "[LANGUE", "[DEBUG", "[DIAG", "[STATE", "[ANALYSE", "[ANALYSIS",
+    "<ETAT", "<LANGUE", "<DEBUG", "<DIAG", "<STATE", "<ANALYSE", "<ANALYSIS",
+    "ETAT", "ÉTAT", "LANGUE", "DEBUG", "DIAG", "STATE", "ANALYSE", "ANALYSIS",
+    "LANG=", "{LANG", "MODE=", "{MODE", "TYPE=", "{TYPE", "INTENT=", "{INTENT",
+  ];
+
+  return markers.some((marker) => marker.startsWith(trimmed) || trimmed.startsWith(marker));
 }
 
 export async function* chatGeminiRequestStream(
@@ -276,8 +290,8 @@ export async function* chatGeminiRequestStream(
     await waitKeyInterval(keyIndex);
     const startTime = Date.now();
     let recorded = false;
-    let stateBuf = '';      // accumulator for ETAT block (before -----)
-    let streaming = false;  // true once ----- is found
+    let prefixBuf = '';
+    let prefixResolved = false;
     try {
       keyLastUsed.set(keyIndex, Date.now());
       for await (const chunk of callGeminiStream(apiKey, model, contents, systemPrompt)) {
@@ -289,24 +303,27 @@ export async function* chatGeminiRequestStream(
           });
         }
 
-        if (!streaming) {
-          stateBuf += chunk;
-          const sepIdx = stateBuf.indexOf('-----');
-          if (sepIdx !== -1) {
-            streaming = true;
-            const afterSep = stateBuf.slice(sepIdx + 5);
-            stateBuf = '';
-            if (afterSep) {
-              yield sanitizeEtatOutput(afterSep);
-            }
+        if (!prefixResolved) {
+          prefixBuf += chunk;
+          const sanitized = sanitizeEtatOutput(prefixBuf);
+          const hasSeparator = prefixBuf.includes("-----");
+          const strippedSomething = sanitized !== prefixBuf.trimStart();
+
+          if (!hasSeparator && !strippedSomething && prefixBuf.length < 80 && maybeDiagnosticPrefix(prefixBuf)) {
+            continue;
           }
-        } else {
-          yield sanitizeEtatOutput(chunk);
+
+          prefixResolved = true;
+          prefixBuf = '';
+          if (sanitized) yield sanitized;
+          continue;
         }
+
+        yield sanitizeEtatOutput(chunk);
       }
-      // Fallback: no separator found — yield everything
-      if (!streaming && stateBuf) {
-        yield sanitizeEtatOutput(stateBuf);
+      if (!prefixResolved && prefixBuf) {
+        const sanitized = sanitizeEtatOutput(prefixBuf);
+        if (sanitized) yield sanitized;
       }
       if (!recorded) {
         recordAttempt({

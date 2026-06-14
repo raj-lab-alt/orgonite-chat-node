@@ -497,7 +497,9 @@ function stripInternalPromptTags(text) {
   return String(text || '')
     .replace(/\[(?:MODE A|MODE B|MODE C)\]\s*/gi, '')
     .replace(/\[INSTRUCTION\][\s\S]*?\[\/INSTRUCTION\]\s*/gi, '')
-    .replace(/(?:^|\n)\s*\[{1,2}ETAT\][^\n]*(?:\n\s*-{3,}\s*)?/gi, '\n')
+    .replace(/<\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>[\s\S]*?<\s*\/\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>/gi, '\n')
+    .replace(/(?:^|\n)\s*\[{1,2}\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]?[^\n]*(?:\n\s*-{3,}\s*)?/gi, '\n')
+    .replace(/(?:^|\n)\s*(?:\{?\b(?:lang|mode|type|intent|prenom|besoin|outil_cible|prix_dit|order_confirmed_flag|tel|tel_raw|doublon)\b\}?\s*=[^\n|]*(?:\|\s*)?){2,}[^\n]*(?:\n\s*-{3,}\s*)?/gi, '\n')
     .trim();
 }
 

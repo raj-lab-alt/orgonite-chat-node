@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sanitizeAssistantReply = sanitizeAssistantReply;
+exports.stripInternalDiagnostics = stripInternalDiagnostics;
 const DIAGNOSTIC_KEYS = new Set([
     "lang",
     "mode",
@@ -15,19 +16,38 @@ const DIAGNOSTIC_KEYS = new Set([
     "tel_raw",
     "doublon",
 ]);
+const DIAGNOSTIC_LINE_MARKER = /\[+\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]+|^(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*[:=-]/i;
+const DIAGNOSTIC_KEY_PATTERN = /\{?\b(?:lang|mode|type|intent|prenom|besoin|outil_cible|prix_dit|order_confirmed_flag|tel|tel_raw|doublon)\b\}?\s*=/gi;
+const SEPARATOR_LINE = /^\s*-{3,}\s*$/;
 function sanitizeAssistantReply(reply) {
-    let cleaned = stripStateDiagnosticBlocks(stripDiagnosticJsonAtStart(reply));
+    let cleaned = stripInternalDiagnostics(stripDiagnosticJsonAtStart(reply));
     cleaned = cleaned.replace(/```json\s*\{[\s\S]*?\}\s*```/gi, (block) => {
         const json = block.replace(/^```json\s*/i, "").replace(/\s*```$/i, "");
         return isDiagnosticJson(json) ? "" : block;
     });
+    cleaned = cleaned.replace(/```[\s\S]*?```/g, (block) => isDiagnosticText(block) ? "" : block);
     cleaned = cleaned.replace(/---\s*INSTRUCTION STRICTE[^]*?(?=\[RENDER_PRODUCT|$)/gi, "").trim();
     return cleaned.trim();
 }
-function stripStateDiagnosticBlocks(reply) {
-    return reply
-        .replace(/(?:^|\n)\s*\[{1,2}ETAT\][^\n]*(?:\n\s*-{3,}\s*)?/gi, "\n")
-        .trimStart();
+function stripInternalDiagnostics(reply) {
+    let text = String(reply || "")
+        .replace(/<\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>[\s\S]*?<\s*\/\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>/gi, "\n")
+        .replace(/(?:^|\n)\s*\[{1,2}\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]?[^\n]*/gi, "\n")
+        .replace(/^\s*-{3,}\s*(?:\r?\n)?/, "");
+    const lines = text.split(/\r?\n/);
+    let removedDiagnostic = false;
+    const kept = [];
+    for (const line of lines) {
+        if (isDiagnosticLine(line)) {
+            removedDiagnostic = true;
+            continue;
+        }
+        if (removedDiagnostic && SEPARATOR_LINE.test(line)) {
+            continue;
+        }
+        kept.push(line);
+    }
+    return kept.join("\n").trimStart();
 }
 function stripDiagnosticJsonAtStart(reply) {
     let text = reply.trimStart();
@@ -86,5 +106,20 @@ function isDiagnosticJson(value) {
     catch {
         return false;
     }
+}
+function isDiagnosticLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed)
+        return false;
+    if (DIAGNOSTIC_LINE_MARKER.test(trimmed))
+        return true;
+    const matches = trimmed.match(DIAGNOSTIC_KEY_PATTERN);
+    DIAGNOSTIC_KEY_PATTERN.lastIndex = 0;
+    return Boolean(matches && matches.length >= 2);
+}
+function isDiagnosticText(value) {
+    const matches = value.match(DIAGNOSTIC_KEY_PATTERN);
+    DIAGNOSTIC_KEY_PATTERN.lastIndex = 0;
+    return DIAGNOSTIC_LINE_MARKER.test(value) || Boolean(matches && matches.length >= 3);
 }
 //# sourceMappingURL=reply-sanitize.js.map

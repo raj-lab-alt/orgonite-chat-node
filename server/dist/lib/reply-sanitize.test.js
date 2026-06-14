@@ -33,5 +33,17 @@ const reply_sanitize_js_1 = require("./reply-sanitize.js");
         const reply = `[[ETAT] {lang}=fr | {mode}=A | {type}=protection | {intent}=decouverte\n-----\nBonjour`;
         (0, vitest_1.expect)((0, reply_sanitize_js_1.sanitizeAssistantReply)(reply)).toBe("Bonjour");
     });
+    (0, vitest_1.it)("strips multiline state diagnostics and language markers", () => {
+        const reply = `[ETAT]\nlang=fr | mode=A | type=protection\nintent=decouverte | besoin=stress | tel=?\n[LANGUE] lang=fr\n-----\nBonjour`;
+        (0, vitest_1.expect)((0, reply_sanitize_js_1.sanitizeAssistantReply)(reply)).toBe("Bonjour");
+    });
+    (0, vitest_1.it)("strips xml-like diagnostic blocks", () => {
+        const reply = `<ETAT>\n{lang}=fr | {mode}=A | {intent}=info\n</ETAT>\nBonjour`;
+        (0, vitest_1.expect)((0, reply_sanitize_js_1.sanitizeAssistantReply)(reply)).toBe("Bonjour");
+    });
+    (0, vitest_1.it)("strips diagnostic key-value lines without explicit marker", () => {
+        const reply = `{lang}=fr | {mode}=A | {type}=protection | {doublon}=non\nBonjour`;
+        (0, vitest_1.expect)((0, reply_sanitize_js_1.sanitizeAssistantReply)(reply)).toBe("Bonjour");
+    });
 });
 //# sourceMappingURL=reply-sanitize.test.js.map

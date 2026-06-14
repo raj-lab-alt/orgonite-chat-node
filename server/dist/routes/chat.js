@@ -570,7 +570,7 @@ exports.chatRouter.post("/", (req, res) => {
             logger_js_1.logger.error("Chat error", { error: errMsg });
             if (!res.writableEnded) {
                 const status = errorStatus(err);
-                res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
+                res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur", retryAfter: status === 429 ? err.retryAfter : undefined });
             }
         }
     }, 0);
@@ -623,7 +623,7 @@ exports.chatRouter.post("/voice", upload.single("audio"), (req, res) => {
             logger_js_1.logger.error("Voice chat error", { error: errMsg });
             if (!res.headersSent) {
                 const status = errorStatus(err);
-                res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
+                res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur", retryAfter: status === 429 ? err.retryAfter : undefined });
             }
         }
     }, 0);

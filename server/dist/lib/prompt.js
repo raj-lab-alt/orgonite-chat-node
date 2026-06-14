@@ -49,9 +49,11 @@ Interdit: ne reponds jamais en lettres latines si le prospect ecrit en lettres a
     const outputFormatAddendum = `
 
 [FORMAT DE SORTIE - REGLE PRIORITAIRE]
-La reponse doit TOUJOURS commencer par le bloc [ETAT] ci-dessous, suivi d'un separateur "-----", puis du message naturel destine au client.
-Ne montre jamais d'objet d'analyse, de JSON brut, de raisonnement technique, ni de diagnostic interne autre que le bloc [ETAT] autorise.
-Les balises autorisees dans le message client: [RENDER_PRODUCT:id] et <ORDER>{...}</ORDER> quand une commande complete doit etre creee.
+La reponse visible doit contenir UNIQUEMENT le message naturel destine au client.
+Ne montre jamais d'objet d'analyse, de JSON brut, de raisonnement technique, ni de diagnostic interne.
+Interdit explicitement dans la reponse visible: [ETAT], [LANGUE], DEBUG, DIAG, STATE, ANALYSE, lang=, mode=, type=, intent=, prenom=, besoin=, outil_cible=, prix_dit=, order_confirmed_flag=, tel=, tel_raw=, doublon=, et toute variante avec accolades comme {lang}=fr.
+N'ecris jamais de separateur technique "-----" entre un etat interne et le message.
+Les seules balises autorisees dans le message client sont: [RENDER_PRODUCT:id] et <ORDER>{...}</ORDER> quand une commande complete doit etre creee.
 
 `;
     const productRenderingAddendum = `
@@ -85,34 +87,7 @@ Ces donnees sont indispensables pour fabriquer la piece. Si une seule manque, de
 4. [RENDER_PRODUCT:id] ne doit JAMAIS etre utilise avec un id invente. Utilise uniquement un id depuis [CATALOGUE PRODUITS].
 
 `;
-    const etatTrackingAddendum = `
-
-[ETAT - TRACKING DE CONVERSATION - REGLE OBLIGATOIRE]
-Tu DOIS commencer chaque reponse EXACTEMENT comme ceci :
-
-[ETAT] {lang}=fr | {mode}=A | {type}=protection | {intent}=decouverte | {prenom}=? | {besoin}=? | {outil_cible}=? | {prix_dit}=non | {order_confirmed_flag}=non | {tel}=? | {tel_raw}=? | {doublon}=non
-[LANGUE] {lang}=fr
------
-
-Les champs {variable}= valeur (avec les accolades) doivent etre mis a jour a chaque reponse.
-Valeurs possibles pour chaque champ :
-- {lang} : fr, darija_latin ou arabe (selon la langue du prospect)
-- {mode} : A (accueil), B (produit), C (personnalise)
-- {type} : protection, spiritual, love, abundance, islamic, accessory ou custom
-- {intent} : decouverte, info, achat ou suivi
-- {prenom} : le prenom du client, ? si inconnu
-- {besoin} : le besoin exprime par le client
-- {outil_cible} : l'outil qui interesse le client
-- {prix_dit} : non ou oui (des que le budget est aborde)
-- {order_confirmed_flag} : non, saisie ou confirme
-- {tel} : telephone, ? si inconnu
-- {tel_raw} : telephone brut, ? si inconnu
-- {doublon} : non ou oui (deja client)
-
-Le bloc [ETAT] est visible par le client. Ecris-le correctement formatted.
-
-`;
-    return strictProhibitionAddendum + prompt + languageAddendum + etatTrackingAddendum + outputFormatAddendum + productRenderingAddendum + productTypePrompt + manufacturingAddendum;
+    return strictProhibitionAddendum + prompt + languageAddendum + outputFormatAddendum + productRenderingAddendum + productTypePrompt + manufacturingAddendum;
 }
 function getProductTypePrompt(productType) {
     const map = {

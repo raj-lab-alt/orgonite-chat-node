@@ -27,6 +27,6 @@ export declare function chatGeminiRequestStream(message: string, extraFields: {
     imageMimeType?: string | null;
     audioBase64?: string | null;
     audioMimeType?: string | null;
-}, history: ChatMessage[], productId: string | null, conversationMode: string, isVoice: boolean, productType: string, systemPrompt: string, apiKeys: string[], models: string[]): AsyncGenerator<string>;
+}, history: ChatMessage[], productId: string | null, conversationMode: string, isVoice: boolean, productType: string, systemPrompt: string, apiKeys: string[], models: string[], retryDepth?: number): AsyncGenerator<string>;
 export {};
 //# sourceMappingURL=gemini.d.ts.map

@@ -39,4 +39,19 @@ describe("sanitizeAssistantReply", () => {
     const reply = `[[ETAT] {lang}=fr | {mode}=A | {type}=protection | {intent}=decouverte\n-----\nBonjour`;
     expect(sanitizeAssistantReply(reply)).toBe("Bonjour");
   });
+
+  it("strips multiline state diagnostics and language markers", () => {
+    const reply = `[ETAT]\nlang=fr | mode=A | type=protection\nintent=decouverte | besoin=stress | tel=?\n[LANGUE] lang=fr\n-----\nBonjour`;
+    expect(sanitizeAssistantReply(reply)).toBe("Bonjour");
+  });
+
+  it("strips xml-like diagnostic blocks", () => {
+    const reply = `<ETAT>\n{lang}=fr | {mode}=A | {intent}=info\n</ETAT>\nBonjour`;
+    expect(sanitizeAssistantReply(reply)).toBe("Bonjour");
+  });
+
+  it("strips diagnostic key-value lines without explicit marker", () => {
+    const reply = `{lang}=fr | {mode}=A | {type}=protection | {doublon}=non\nBonjour`;
+    expect(sanitizeAssistantReply(reply)).toBe("Bonjour");
+  });
 });

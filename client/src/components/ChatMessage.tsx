@@ -115,7 +115,9 @@ function cleanMessageContent(content: string, trustedHtml?: boolean) {
     .replace(/<ORDER>[\s\S]*?<\/ORDER>/gi, "")
     .replace(/<ORDER>[\s\S]*$/gi, "")
     .replace(/\{\s*"nom"\s*:[\s\S]*?\}/g, "")
-    .replace(/(?:^|\n)\s*\[{1,2}ETAT\][^\n]*(?:\n\s*-{3,}\s*)?/gi, "\n")
+    .replace(/<\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>[\s\S]*?<\s*\/\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>/gi, "\n")
+    .replace(/(?:^|\n)\s*\[{1,2}\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]?[^\n]*(?:\n\s*-{3,}\s*)?/gi, "\n")
+    .replace(/(?:^|\n)\s*(?:\{?\b(?:lang|mode|type|intent|prenom|besoin|outil_cible|prix_dit|order_confirmed_flag|tel|tel_raw|doublon)\b\}?\s*=[^\n|]*(?:\|\s*)?){2,}[^\n]*(?:\n\s*-{3,}\s*)?/gi, "\n")
     .replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "");
 
   if (trustedHtml) {

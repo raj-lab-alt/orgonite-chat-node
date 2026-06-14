@@ -13,20 +13,47 @@ const DIAGNOSTIC_KEYS = new Set([
   "doublon",
 ]);
 
+const DIAGNOSTIC_LINE_MARKER = /\[+\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]+|^(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*[:=-]/i;
+const DIAGNOSTIC_KEY_PATTERN = /\{?\b(?:lang|mode|type|intent|prenom|besoin|outil_cible|prix_dit|order_confirmed_flag|tel|tel_raw|doublon)\b\}?\s*=/gi;
+const SEPARATOR_LINE = /^\s*-{3,}\s*$/;
+
 export function sanitizeAssistantReply(reply: string): string {
-  let cleaned = stripStateDiagnosticBlocks(stripDiagnosticJsonAtStart(reply));
+  let cleaned = stripInternalDiagnostics(stripDiagnosticJsonAtStart(reply));
   cleaned = cleaned.replace(/```json\s*\{[\s\S]*?\}\s*```/gi, (block) => {
     const json = block.replace(/^```json\s*/i, "").replace(/\s*```$/i, "");
     return isDiagnosticJson(json) ? "" : block;
   });
+  cleaned = cleaned.replace(/```[\s\S]*?```/g, (block) =>
+    isDiagnosticText(block) ? "" : block
+  );
   cleaned = cleaned.replace(/---\s*INSTRUCTION STRICTE[^]*?(?=\[RENDER_PRODUCT|$)/gi, "").trim();
   return cleaned.trim();
 }
 
-function stripStateDiagnosticBlocks(reply: string): string {
-  return reply
-    .replace(/(?:^|\n)\s*\[{1,2}ETAT\][^\n]*(?:\n\s*-{3,}\s*)?/gi, "\n")
-    .trimStart();
+export function stripInternalDiagnostics(reply: string): string {
+  let text = String(reply || "")
+    .replace(/<\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>[\s\S]*?<\s*\/\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>/gi, "\n")
+    .replace(/(?:^|\n)\s*\[{1,2}\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]?[^\n]*/gi, "\n")
+    .replace(/^\s*-{3,}\s*(?:\r?\n)?/, "");
+
+  const lines = text.split(/\r?\n/);
+  let removedDiagnostic = false;
+  const kept: string[] = [];
+
+  for (const line of lines) {
+    if (isDiagnosticLine(line)) {
+      removedDiagnostic = true;
+      continue;
+    }
+
+    if (removedDiagnostic && SEPARATOR_LINE.test(line)) {
+      continue;
+    }
+
+    kept.push(line);
+  }
+
+  return kept.join("\n").trimStart();
 }
 
 function stripDiagnosticJsonAtStart(reply: string): string {
@@ -88,4 +115,20 @@ function isDiagnosticJson(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isDiagnosticLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (DIAGNOSTIC_LINE_MARKER.test(trimmed)) return true;
+
+  const matches = trimmed.match(DIAGNOSTIC_KEY_PATTERN);
+  DIAGNOSTIC_KEY_PATTERN.lastIndex = 0;
+  return Boolean(matches && matches.length >= 2);
+}
+
+function isDiagnosticText(value: string): boolean {
+  const matches = value.match(DIAGNOSTIC_KEY_PATTERN);
+  DIAGNOSTIC_KEY_PATTERN.lastIndex = 0;
+  return DIAGNOSTIC_LINE_MARKER.test(value) || Boolean(matches && matches.length >= 3);
 }

@@ -5,6 +5,7 @@ exports.buildContents = buildContents;
 exports.callGemini = callGemini;
 exports.chatGeminiRequestStream = chatGeminiRequestStream;
 const logger_js_1 = require("../lib/logger.js");
+const reply_sanitize_js_1 = require("../lib/reply-sanitize.js");
 const gemini_stats_js_1 = require("./gemini-stats.js");
 const gemini_models_js_1 = require("./gemini-models.js");
 function buildContents(messages) {
@@ -113,36 +114,73 @@ class GeminiError extends Error {
 }
 exports.GeminiError = GeminiError;
 let globalKeyIndex = 0;
-async function firstSuccess(promises) {
-    return new Promise((resolve, reject) => {
-        if (promises.length === 0)
-            reject(new Error("No promises"));
-        let failures = 0;
-        for (const p of promises) {
-            p.then(resolve, () => {
-                failures++;
-                if (failures === promises.length)
-                    reject(new Error("All promises failed"));
-            });
-        }
-    });
-}
-async function takeFirstChunk(stream) {
-    try {
-        const { value, done } = await stream.next();
-        if (done)
-            return null;
-        async function* rest() {
-            yield value;
-            yield* stream;
-        }
-        return { firstChunk: value, rest: rest() };
-    }
-    catch {
-        return null;
+let globalModelIndex = 0;
+let topModelIndex = 0;
+const MIN_SOLID_SAMPLES = 10;
+const KEY_COOLDOWN_MS = 5000;
+const KEY_MIN_INTERVAL_MS = 2000;
+const keyCooldowns = new Map();
+const keyLastUsed = new Map();
+async function waitKeyInterval(keyIndex) {
+    const lastUsed = keyLastUsed.get(keyIndex) || 0;
+    const elapsed = Date.now() - lastUsed;
+    if (elapsed < KEY_MIN_INTERVAL_MS) {
+        await new Promise(r => setTimeout(r, KEY_MIN_INTERVAL_MS - elapsed));
     }
 }
-async function* chatGeminiRequestStream(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, models) {
+function getTopModels(models) {
+    const stats = (0, gemini_stats_js_1.getModelStats)();
+    const scored = stats.models
+        .filter(m => m.requests >= MIN_SOLID_SAMPLES)
+        .sort((a, b) => {
+        if (b.successRate !== a.successRate)
+            return b.successRate - a.successRate;
+        if (b.winRate !== a.winRate)
+            return b.winRate - a.winRate;
+        return a.avgLatencyMs - b.avgLatencyMs;
+    })
+        .slice(0, 5)
+        .map(m => m.model)
+        .filter(m => models.includes(m));
+    return scored.length >= 1 ? scored : null;
+}
+function pickModel(models) {
+    const topModels = getTopModels(models);
+    if (topModels) {
+        const idx = topModelIndex++ % topModels.length;
+        return topModels[idx];
+    }
+    return models[globalModelIndex++ % models.length];
+}
+function pickKeyIndex(apiKeysLength) {
+    for (let i = 0; i < apiKeysLength; i++) {
+        const idx = globalKeyIndex++ % apiKeysLength;
+        const until = keyCooldowns.get(idx);
+        if (!until || Date.now() > until)
+            return idx;
+    }
+    // All keys in cooldown — pick the next one anyway
+    return globalKeyIndex++ % apiKeysLength;
+}
+function sanitizeEtatOutput(text) {
+    text = (0, reply_sanitize_js_1.stripInternalDiagnostics)(text);
+    text = text.replace(/\{(\w+)\}=/g, '$1=');
+    text = text.replace(/\{\s*/g, '');
+    return text;
+}
+function maybeDiagnosticPrefix(text) {
+    const trimmed = text.trimStart().toUpperCase();
+    if (!trimmed)
+        return true;
+    const markers = [
+        "[ETAT", "[ÉTAT", "[LANGUE", "[DEBUG", "[DIAG", "[STATE", "[ANALYSE", "[ANALYSIS",
+        "<ETAT", "<LANGUE", "<DEBUG", "<DIAG", "<STATE", "<ANALYSE", "<ANALYSIS",
+        "ETAT", "ÉTAT", "LANGUE", "DEBUG", "DIAG", "STATE", "ANALYSE", "ANALYSIS",
+        "LANG=", "{LANG", "MODE=", "{MODE", "TYPE=", "{TYPE", "INTENT=", "{INTENT",
+    ];
+    return markers.some((marker) => marker.startsWith(trimmed) || trimmed.startsWith(marker));
+}
+async function* chatGeminiRequestStream(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, models, retryDepth = 0) {
     if (!apiKeys.length)
         throw new Error("Aucune cle API Gemini configuree.");
     // Auto-refresh if models list is empty (first use)
@@ -154,7 +192,10 @@ async function* chatGeminiRequestStream(message, extraFields, history, productId
         models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
     }
     const mode = (conversationMode || (productId === "orgonite_perso" ? "C" : productId ? "B" : "A")).toUpperCase();
-    const trimmedHistory = history.slice(0, 100);
+    const trimmedHistory = history.slice(0, 100).map(msg => ({
+        ...msg,
+        text: msg.text ? sanitizeEtatOutput(msg.text) : msg.text,
+    }));
     const messages = [...trimmedHistory];
     // Mode A first message prevention
     const firstMessage = history.length === 0;
@@ -180,77 +221,87 @@ async function* chatGeminiRequestStream(message, extraFields, history, productId
         }),
     });
     const contents = buildContents(messages);
-    // Key rotation: pick next key in round-robin
-    const keyIndex = globalKeyIndex++ % apiKeys.length;
-    const apiKey = apiKeys[keyIndex];
-    // Launch all models in parallel with the chosen key
-    const controllers = models.map(() => new AbortController());
-    const startTimes = new Array(models.length);
-    const streams = models.map((model, i) => callGeminiStream(apiKey, model, contents, systemPrompt, controllers[i].signal));
-    // Race for first chunk across all models
-    const firstChunkPromises = streams.map(async (stream, i) => {
-        startTimes[i] = Date.now();
-        const result = await takeFirstChunk(stream);
-        if (!result)
-            throw new Error("Empty stream");
-        return { ...result, index: i, latencyMs: Date.now() - startTimes[i] };
-    });
-    // Prevent unhandled rejections from losers that get aborted
-    for (const p of firstChunkPromises)
-        p.catch(() => { });
-    let winner;
-    try {
-        winner = await firstSuccess(firstChunkPromises);
-    }
-    catch (firstErr) {
-        controllers.forEach(c => { try {
-            c.abort();
-        }
-        catch { } });
-        for (let i = 0; i < models.length; i++) {
-            (0, gemini_stats_js_1.recordAttempt)({
-                model: models[i],
-                keyIndex,
-                success: false,
-                winner: false,
-                latencyMs: startTimes[i] ? Date.now() - startTimes[i] : 0,
-            });
-        }
-        // All models failed — try refreshing the model list and retry once
+    // Sequential retry — try best model+key combos first (by stats), fallback round-robin
+    let lastError;
+    for (let attempt = 0; attempt < models.length; attempt++) {
+        const model = pickModel(models);
+        const keyIndex = pickKeyIndex(apiKeys.length);
+        const apiKey = apiKeys[keyIndex];
+        await waitKeyInterval(keyIndex);
+        const startTime = Date.now();
+        let recorded = false;
+        let prefixBuf = '';
+        let prefixResolved = false;
         try {
-            const newModels = await (0, gemini_models_js_1.refreshModelList)(apiKeys[0]);
-            const changed = newModels.length !== models.length ||
-                newModels.some((m, i) => m !== models[i]);
-            if (!changed)
-                throw firstErr;
+            keyLastUsed.set(keyIndex, Date.now());
+            for await (const chunk of callGeminiStream(apiKey, model, contents, systemPrompt)) {
+                if (!recorded) {
+                    recorded = true;
+                    (0, gemini_stats_js_1.recordAttempt)({
+                        model, keyIndex, success: true, winner: true,
+                        latencyMs: Date.now() - startTime,
+                    });
+                }
+                if (!prefixResolved) {
+                    prefixBuf += chunk;
+                    const sanitized = sanitizeEtatOutput(prefixBuf);
+                    const hasSeparator = prefixBuf.includes("-----");
+                    const strippedSomething = sanitized !== prefixBuf.trimStart();
+                    if (!hasSeparator && !strippedSomething && prefixBuf.length < 80 && maybeDiagnosticPrefix(prefixBuf)) {
+                        continue;
+                    }
+                    prefixResolved = true;
+                    prefixBuf = '';
+                    if (sanitized)
+                        yield sanitized;
+                    continue;
+                }
+                yield sanitizeEtatOutput(chunk);
+            }
+            if (!prefixResolved && prefixBuf) {
+                const sanitized = sanitizeEtatOutput(prefixBuf);
+                if (sanitized)
+                    yield sanitized;
+            }
+            if (!recorded) {
+                (0, gemini_stats_js_1.recordAttempt)({
+                    model, keyIndex, success: true, winner: true,
+                    latencyMs: Date.now() - startTime,
+                });
+            }
+            return;
+        }
+        catch (err) {
+            if (!recorded) {
+                (0, gemini_stats_js_1.recordAttempt)({
+                    model, keyIndex, success: false, winner: false,
+                    latencyMs: Date.now() - startTime,
+                });
+            }
+            lastError = err;
+            if (err.statusCode === 429) {
+                keyCooldowns.set(keyIndex, Date.now() + KEY_COOLDOWN_MS);
+                await new Promise(r => setTimeout(r, 3000));
+            }
+            continue;
+        }
+    }
+    // All models failed with 429 — wait and retry once
+    if (retryDepth < 1 && lastError && lastError.statusCode === 429) {
+        await new Promise(r => setTimeout(r, 5000));
+        return yield* chatGeminiRequestStream(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, models, retryDepth + 1);
+    }
+    // Try refreshing the model list and retry once
+    try {
+        const newModels = await (0, gemini_models_js_1.refreshModelList)(apiKeys[0]);
+        const changed = newModels.length !== models.length ||
+            newModels.some((m, i) => m !== models[i]);
+        if (changed) {
             logger_js_1.logger.info(`Retrying with refreshed models: ${newModels.join(", ")}`);
             return yield* chatGeminiRequestStream(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, newModels);
         }
-        catch {
-            throw firstErr;
-        }
     }
-    // Abort all loser models
-    controllers.forEach((c, i) => { if (i !== winner.index) {
-        try {
-            c.abort();
-        }
-        catch { }
-    } });
-    // Record stats: winner is success, losers are non-success (aborted)
-    for (let i = 0; i < models.length; i++) {
-        (0, gemini_stats_js_1.recordAttempt)({
-            model: models[i],
-            keyIndex,
-            success: i === winner.index,
-            winner: i === winner.index,
-            latencyMs: i === winner.index ? winner.latencyMs : (startTimes[i] ? Date.now() - startTimes[i] : 0),
-        });
-    }
-    // Yield from winner
-    yield winner.firstChunk;
-    for await (const chunk of winner.rest) {
-        yield chunk;
-    }
+    catch { }
+    throw lastError || new Error("Tous les modeles ont echoue.");
 }
 //# sourceMappingURL=gemini.js.map
