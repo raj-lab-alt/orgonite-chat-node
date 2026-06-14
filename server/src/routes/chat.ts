@@ -426,10 +426,13 @@ chatRouter.get("/diag", async (_req: Request, res: Response) => {
 });
 
 // POST /api/chat — text + optional image
-// TEST: full flow (stats + res.json)
 chatRouter.post("/", (req: Request, res: Response) => {
+  // Use setTimeout(0) to prevent Express 5's async handler detection from
+  // interfering with the response lifecycle. This ensures the handler returns
+  // before any async work begins, avoiding auto-next() behavior.
   setTimeout(async () => {
     try {
+      await checkRateLimit(req.ip);
       const body = z.object({
         message: z.string().max(2000).default(""),
         imageBase64: z.string().nullable().optional(),
@@ -446,19 +449,45 @@ chatRouter.post("/", (req: Request, res: Response) => {
         path: ["message"],
       }).parse(req.body);
 
+      let message = body.message;
+      if (body.orderConfirmed) {
+        message = `[INSTRUCTION]Le prospect a deja confirme sa commande via la modale. NE PAS demander de confirmation ni re-presenter l'outil. Suivre le Closing normal etape par etape (nom → gouvernorat → adresse → telephone → disponibilite). Une fois la commande creee avec <ORDER>, AVANT d'envoyer le message de confirmation finale, proposer OBLIGATOIREMENT l'upsell livraison offerte des 2 outils. Ne pas sauter l'upsell.[/INSTRUCTION] ${message}`;
+      }
+
+      const extraFields = {
+        imageBase64: body.imageBase64 || null,
+        imageMimeType: body.imageMimeType || null,
+        audioBase64: null,
+        audioMimeType: null,
+      };
+
+      const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
+      if (wantsStream) {
+        await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
+        return;
+      }
+
       const result = await generateChatResult(
-        body.message, { imageBase64: null, imageMimeType: null, audioBase64: null, audioMimeType: null },
-        body.history, body.productId || null, body.conversationMode, false,
-        body.productType, body.orderConfirmed, body.renderedProductIds
+        message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds
       );
       await recordConversationStats(req, body.conversationMode, result);
       if (!res.writableEnded) {
-        res.json({ ok: true, step: "full", reply: result.reply });
+        res.json(result);
       }
     } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        if (!res.writableEnded) {
+          res.status(400).json({
+            error: err.errors.map((issue: any) => issue.message).join(", "),
+          });
+        }
+        return;
+      }
       const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
-      console.error("[handler error]", errMsg);
-      if (!res.writableEnded) res.json({ ok: false, step: "full", error: errMsg });
+      logger.error("Chat error", { error: errMsg });
+      if (!res.writableEnded) {
+        res.status(500).json({ error: "Erreur interne du serveur" });
+      }
     }
   }, 0);
 });
