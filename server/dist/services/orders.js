@@ -12,6 +12,7 @@ exports.orderResponse = orderResponse;
 exports.detectOrderFromReply = detectOrderFromReply;
 exports.detectProductsFromReply = detectProductsFromReply;
 const supabase_js_1 = require("../lib/supabase.js");
+const admin_ws_js_1 = require("../lib/admin-ws.js");
 function generateOrderId() {
     const ts = Date.now().toString(36).toUpperCase();
     const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -165,56 +166,72 @@ async function saveOrderWithoutDuplicate(data, statuses, products) {
     const newProduct = normalizeOrderText(data.produit || "");
     const newName = normalizeOrderText(data.nom || "");
     const now = new Date().toISOString();
+    // Acquire advisory lock before dedup check (prevents TOCTOU race)
     if (newPhone) {
-        const twentyFourHoursAgo = new Date(Date.now() - 86400000).toISOString();
-        const { data: existingOrders } = await supabase_js_1.supabase
-            .from("orders")
-            .select("*")
-            .eq("telephone", newPhone)
-            .neq("statut", "corbeille")
-            .gte("date", twentyFourHoursAgo)
-            .order("date", { ascending: false });
-        if (existingOrders && existingOrders.length > 0) {
-            for (const existing of existingOrders) {
-                const sameProduct = newProduct !== "" &&
-                    normalizeOrderText(existing.produit || "") === newProduct;
-                const sameName = newName !== "" &&
-                    normalizeOrderText(existing.nom || "") === newName;
-                if (replaceRequested || fusionRequested || sameProduct || sameName || !newProduct) {
-                    const dataToSave = fusionRequested
-                        ? mergeOrderData(existing, data)
-                        : { ...data };
-                    if (!fusionRequested) {
-                        const backendNote = replaceRequested
-                            ? "Backend: remplacement demande via remplace_commande. Commande existante mise a jour."
-                            : "Backend: doublon detecte sur commande recente. Commande existante mise a jour.";
-                        dataToSave.notes = appendNote(existing.notes || "", appendNote(dataToSave.notes || "", backendNote));
+        try {
+            await supabase_js_1.supabase.rpc("try_acquire_dedup_lock", { p_phone: newPhone });
+        }
+        catch { /* lock not available, proceed anyway */ }
+    }
+    for (let attempt = 0; attempt < 3; attempt++) {
+        if (newPhone) {
+            const twentyFourHoursAgo = new Date(Date.now() - 86400000).toISOString();
+            const { data: existingOrders } = await supabase_js_1.supabase
+                .from("orders")
+                .select("*")
+                .eq("telephone", newPhone)
+                .neq("statut", "corbeille")
+                .gte("date", twentyFourHoursAgo)
+                .order("date", { ascending: false });
+            if (existingOrders && existingOrders.length > 0) {
+                for (const existing of existingOrders) {
+                    const sameProduct = newProduct !== "" &&
+                        normalizeOrderText(existing.produit || "") === newProduct;
+                    const sameName = newName !== "" &&
+                        normalizeOrderText(existing.nom || "") === newName;
+                    if (replaceRequested || fusionRequested || sameProduct || sameName || !newProduct) {
+                        const dataToSave = fusionRequested
+                            ? mergeOrderData(existing, data)
+                            : { ...data };
+                        if (!fusionRequested) {
+                            const backendNote = replaceRequested
+                                ? "Backend: remplacement demande via remplace_commande. Commande existante mise a jour."
+                                : "Backend: doublon detecte sur commande recente. Commande existante mise a jour.";
+                            dataToSave.notes = appendNote(existing.notes || "", appendNote(dataToSave.notes || "", backendNote));
+                        }
+                        delete dataToSave.remplace_commande;
+                        delete dataToSave.fusion_avec;
+                        const { error } = await supabase_js_1.supabase
+                            .from("orders")
+                            .update(orderToRow({ ...dataToSave, id: existing.id, updated_at: now }))
+                            .eq("id", existing.id);
+                        if (error)
+                            throw error;
+                        return {
+                            order: { ...existing, ...dataToSave, updated_at: now },
+                            created: false,
+                        };
                     }
-                    delete dataToSave.remplace_commande;
-                    delete dataToSave.fusion_avec;
-                    const { error } = await supabase_js_1.supabase
-                        .from("orders")
-                        .update(orderToRow({ ...dataToSave, id: existing.id, updated_at: now }))
-                        .eq("id", existing.id);
-                    if (error)
-                        throw error;
-                    return {
-                        order: { ...existing, ...dataToSave, updated_at: now },
-                        created: false,
-                    };
                 }
             }
         }
+        data.id = data.id || generateOrderId();
+        data.date = now;
+        data.statut = data.statut || statuses[0];
+        delete data.remplace_commande;
+        delete data.fusion_avec;
+        const { error } = await supabase_js_1.supabase.from("orders").insert(orderToRow(data, true));
+        if (error) {
+            // If unique violation (concurrent insert won), retry
+            if (attempt < 2 && newPhone && error.message?.includes("duplicate key")) {
+                continue;
+            }
+            throw error;
+        }
+        (0, admin_ws_js_1.broadcastAdmin)("new_order", { id: data.id, nom: data.nom, produit: data.produit, total: data.totalCommande });
+        return { order: data, created: true };
     }
-    data.id = data.id || generateOrderId();
-    data.date = now;
-    data.statut = data.statut || statuses[0];
-    delete data.remplace_commande;
-    delete data.fusion_avec;
-    const { error } = await supabase_js_1.supabase.from("orders").insert(orderToRow(data, true));
-    if (error)
-        throw error;
-    return { order: data, created: true };
+    throw new Error("Impossible de sauvegarder la commande apres plusieurs tentatives");
 }
 function mergeOrderData(existing, incoming) {
     const merged = { ...incoming };

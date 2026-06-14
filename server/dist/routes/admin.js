@@ -35,10 +35,22 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.adminRouter = void 0;
 const express_1 = require("express");
+const zod_1 = require("zod");
 const supabase_js_1 = require("../lib/supabase.js");
 const auth_js_1 = require("../middleware/auth.js");
 const admin_auth_js_1 = require("../lib/admin-auth.js");
 const app_config_js_1 = require("../lib/app-config.js");
+const logger_js_1 = require("../lib/logger.js");
+const configSchema = zod_1.z.object({
+    systemPrompt: zod_1.z.string().min(1).max(50000).optional(),
+    catalogItemTemplate: zod_1.z.string().min(1).max(10000).optional(),
+    welcomeMessage: zod_1.z.string().min(1).max(5000).optional(),
+    facebookPixelIds: zod_1.z.array(zod_1.z.string().min(1).max(100)).max(20).optional(),
+    googleAnalyticsIds: zod_1.z.array(zod_1.z.string().min(1).max(100)).max(20).optional(),
+    statuses: zod_1.z.array(zod_1.z.string().min(1).max(50)).min(1).max(50).optional(),
+    apiKeys: zod_1.z.array(zod_1.z.string().min(10).max(500)).max(10).optional(),
+    models: zod_1.z.array(zod_1.z.string().min(1).max(100)).min(1).max(20).optional(),
+});
 exports.adminRouter = (0, express_1.Router)();
 async function loadAdminProducts() {
     const { data } = await supabase_js_1.supabase
@@ -77,7 +89,7 @@ exports.adminRouter.post("/login", async (req, res) => {
             if (!configuredPassword) {
                 return res.status(500).json({ error: "ADMIN_PASSWORD non configure" });
             }
-            if (password !== configuredPassword) {
+            if (!(0, admin_auth_js_1.verifyAdminPassword)(password)) {
                 return res.status(401).json({ error: "Identifiants invalides" });
             }
             return res.json({ token: (0, admin_auth_js_1.adminToken)(), user: { role: "admin" } });
@@ -116,34 +128,31 @@ exports.adminRouter.get("/config", auth_js_1.requireAdmin, async (_req, res) => 
 });
 exports.adminRouter.put("/config", auth_js_1.requireAdmin, async (req, res) => {
     try {
-        const body = req.body;
+        const parsed = configSchema.parse(req.body);
         const update = {};
-        if (body.systemPrompt !== undefined)
-            update.systemPrompt = String(body.systemPrompt);
-        if (body.catalogItemTemplate !== undefined)
-            update.catalogItemTemplate = String(body.catalogItemTemplate);
-        if (body.welcomeMessage !== undefined)
-            update.welcomeMessage = String(body.welcomeMessage);
-        if (body.facebookPixelIds !== undefined)
-            update.facebookPixelIds = normalizeStringList(body.facebookPixelIds);
-        if (body.googleAnalyticsIds !== undefined)
-            update.googleAnalyticsIds = normalizeStringList(body.googleAnalyticsIds);
-        if (body.statuses !== undefined)
-            update.statuses = normalizeStringList(body.statuses);
-        if (body.apiKeys !== undefined)
-            update.geminiApiKeys = normalizeStringList(body.apiKeys);
-        if (body.models !== undefined)
-            update.geminiModels = normalizeStringList(body.models);
-        if (update.statuses?.length === 0) {
-            return res.status(400).json({ error: "Au moins un statut est requis" });
-        }
-        if (update.geminiModels?.length === 0) {
-            return res.status(400).json({ error: "Au moins un modele Gemini est requis" });
-        }
+        if (parsed.systemPrompt !== undefined)
+            update.systemPrompt = parsed.systemPrompt;
+        if (parsed.catalogItemTemplate !== undefined)
+            update.catalogItemTemplate = parsed.catalogItemTemplate;
+        if (parsed.welcomeMessage !== undefined)
+            update.welcomeMessage = parsed.welcomeMessage;
+        if (parsed.facebookPixelIds !== undefined)
+            update.facebookPixelIds = parsed.facebookPixelIds;
+        if (parsed.googleAnalyticsIds !== undefined)
+            update.googleAnalyticsIds = parsed.googleAnalyticsIds;
+        if (parsed.statuses !== undefined)
+            update.statuses = parsed.statuses;
+        if (parsed.apiKeys !== undefined)
+            update.geminiApiKeys = parsed.apiKeys;
+        if (parsed.models !== undefined)
+            update.geminiModels = parsed.models;
         await (0, app_config_js_1.updateAppConfig)(update);
         res.json(await buildConfigResponse());
     }
     catch (err) {
+        if (err instanceof zod_1.z.ZodError) {
+            return res.status(400).json({ error: "Validation echouee", details: err.errors });
+        }
         res.status(500).json({ error: err.message });
     }
 });
@@ -163,11 +172,12 @@ exports.adminRouter.get("/stats", auth_js_1.requireAdmin, async (req, res) => {
             .not("statut", "eq", "corbeille")
             .gte("date", since);
         // Page views
-        const { count: uniqueVisitors } = await supabase_js_1.supabase
+        const { data: pageViews } = await supabase_js_1.supabase
             .from("page_views")
-            .select("*", { count: "exact", head: true })
+            .select("session_key")
             .eq("is_admin", false)
             .gte("created_at", since);
+        const uniqueVisitors = new Set((pageViews || []).map((row) => row.session_key).filter(Boolean)).size;
         const totalOrders = orders?.length || 0;
         const deliveredOrders = orders?.filter((o) => o.statut === "livree").length || 0;
         const failedOrders = orders?.filter((o) => ["annule", "injoignable", "non qualifie", "echouer"].includes(o.statut)).length || 0;
@@ -228,7 +238,7 @@ exports.adminRouter.get("/stats", auth_js_1.requireAdmin, async (req, res) => {
         });
     }
     catch (err) {
-        console.error("Stats error:", err);
+        logger_js_1.logger.error("Stats error", { error: err.message });
         res.status(500).json({ error: "Erreur lors du chargement des statistiques" });
     }
 });
@@ -268,9 +278,4 @@ exports.adminRouter.post("/migrate-schema", auth_js_1.requireAdmin, async (_req,
         res.status(500).json({ error: err.message });
     }
 });
-function normalizeStringList(value) {
-    if (!Array.isArray(value))
-        return [];
-    return value.map((item) => String(item).trim()).filter(Boolean);
-}
 //# sourceMappingURL=admin.js.map

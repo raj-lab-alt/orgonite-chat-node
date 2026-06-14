@@ -6,40 +6,44 @@ const supabase_js_1 = require("../lib/supabase.js");
 const auth_js_1 = require("../middleware/auth.js");
 const legacy_config_js_1 = require("../lib/legacy-config.js");
 const product_format_js_1 = require("../lib/product-format.js");
+const cache_js_1 = require("../lib/cache.js");
+const logger_js_1 = require("../lib/logger.js");
+const PRODUCT_TTL = 30_000;
+function cacheKey(isAdmin) { return isAdmin ? "products:admin" : "products:public"; }
+async function fetchProducts(isAdmin) {
+    let query = supabase_js_1.supabase.from("products").select("*");
+    if (!isAdmin)
+        query = query.eq("visible", true);
+    const { data, error } = await query.order(isAdmin ? "created_at" : "name", { ascending: !isAdmin });
+    if (error)
+        throw new Error(error.message);
+    return (data || []).map(product_format_js_1.formatProduct);
+}
+function invalidateProductCache() {
+    (0, cache_js_1.cacheDel)("products:admin");
+    (0, cache_js_1.cacheDel)("products:public");
+}
 exports.productsRouter = (0, express_1.Router)();
 // Public: list visible products
 exports.productsRouter.get("/", async (_req, res) => {
     try {
         const isAdminMount = _req.baseUrl.includes("/api/admin/");
-        let query = supabase_js_1.supabase
-            .from("products")
-            .select("*");
-        if (!isAdminMount) {
-            query = query.eq("visible", true);
-        }
-        const { data, error } = await query.order(isAdminMount ? "created_at" : "name", {
-            ascending: !isAdminMount,
-        });
-        if (error)
-            return res.status(500).json({ error: error.message });
-        res.json((data || []).map(product_format_js_1.formatProduct));
+        const products = await (0, cache_js_1.memoize)(cacheKey(isAdminMount), () => fetchProducts(isAdminMount), PRODUCT_TTL);
+        res.json(products);
     }
     catch (err) {
+        logger_js_1.logger.error("Failed to fetch products", { error: err.message });
         res.status(500).json({ error: err.message });
     }
 });
 // Admin: list all products
 exports.productsRouter.get("/admin", auth_js_1.requireAdmin, async (_req, res) => {
     try {
-        const { data, error } = await supabase_js_1.supabase
-            .from("products")
-            .select("*")
-            .order("created_at", { ascending: false });
-        if (error)
-            return res.status(500).json({ error: error.message });
-        res.json((data || []).map(product_format_js_1.formatProduct));
+        const products = await (0, cache_js_1.memoize)("products:admin", () => fetchProducts(true), PRODUCT_TTL);
+        res.json(products);
     }
     catch (err) {
+        logger_js_1.logger.error("Failed to fetch admin products", { error: err.message });
         res.status(500).json({ error: err.message });
     }
 });
@@ -65,7 +69,7 @@ exports.productsRouter.post("/", auth_js_1.requireAdmin, async (req, res) => {
             welcome_sequence: JSON.stringify(body.welcomeSequence || []),
             stock: parseInt(body.stock) || 10,
             hook: body.hook || "",
-            hook_transition: body.hook_transition || "",
+            hook_transition: body.hookTransition || "",
             upsell_price: body.upsellPrice !== undefined ? parseFloat(body.upsellPrice) : null,
             price_original: body.priceOriginal !== undefined ? parseFloat(body.priceOriginal) : null,
             faq: JSON.stringify(body.faq || []),
@@ -75,9 +79,11 @@ exports.productsRouter.post("/", auth_js_1.requireAdmin, async (req, res) => {
         const { error } = await supabase_js_1.supabase.from("products").insert(product);
         if (error)
             return res.status(500).json({ error: error.message });
+        invalidateProductCache();
         res.json({ success: true, id: body.id });
     }
     catch (err) {
+        logger_js_1.logger.error("Failed to create product", { error: err.message });
         res.status(500).json({ error: err.message });
     }
 });
@@ -102,7 +108,7 @@ exports.productsRouter.put("/:id", auth_js_1.requireAdmin, async (req, res) => {
             welcomeSequence: "welcome_sequence",
             stock: "stock",
             hook: "hook",
-            hook_transition: "hook_transition",
+            hookTransition: "hook_transition",
             upsellPrice: "upsell_price",
             priceOriginal: "price_original",
             faq: "faq",
@@ -134,9 +140,11 @@ exports.productsRouter.put("/:id", auth_js_1.requireAdmin, async (req, res) => {
             .eq("id", req.params.id);
         if (error)
             return res.status(500).json({ error: error.message });
+        invalidateProductCache();
         res.json({ success: true, id: req.params.id });
     }
     catch (err) {
+        logger_js_1.logger.error("Failed to update product", { error: err.message });
         res.status(500).json({ error: err.message });
     }
 });
@@ -149,9 +157,11 @@ exports.productsRouter.delete("/:id", auth_js_1.requireAdmin, async (req, res) =
             .eq("id", req.params.id);
         if (error)
             return res.status(500).json({ error: error.message });
+        invalidateProductCache();
         res.json({ success: true, deleted: true });
     }
     catch (err) {
+        logger_js_1.logger.error("Failed to delete product", { error: err.message });
         res.status(500).json({ error: err.message });
     }
 });
@@ -171,7 +181,9 @@ exports.productsRouter.post("/sync", auth_js_1.requireAdmin, async (req, res) =>
             try {
                 existing = await supabase_js_1.supabase.from("products").select("id").eq("id", p.id).single();
             }
-            catch { }
+            catch {
+                logger_js_1.logger.warn("Failed to fetch existing product for sync", { id: p.id });
+            }
             const productData = {
                 id: p.id,
                 name: p.name || p.id,
@@ -208,9 +220,11 @@ exports.productsRouter.post("/sync", auth_js_1.requireAdmin, async (req, res) =>
                     imported++;
             }
         }
+        invalidateProductCache();
         res.json({ success: true, imported });
     }
     catch (err) {
+        logger_js_1.logger.error("Failed to sync products", { error: err.message });
         res.status(500).json({ error: err.message });
     }
 });

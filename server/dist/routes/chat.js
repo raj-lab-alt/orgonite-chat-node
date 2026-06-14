@@ -15,6 +15,7 @@ const rate_limit_js_1 = require("../services/rate-limit.js");
 const app_config_js_1 = require("../lib/app-config.js");
 const product_format_js_1 = require("../lib/product-format.js");
 const reply_sanitize_js_1 = require("../lib/reply-sanitize.js");
+const logger_js_1 = require("../lib/logger.js");
 exports.chatRouter = (0, express_1.Router)();
 const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 async function getConfig() {
@@ -25,7 +26,9 @@ async function getConfig() {
         if (data)
             products = data;
     }
-    catch { }
+    catch {
+        logger_js_1.logger.warn("Failed to load products");
+    }
     return {
         apiKeys: appConfig.geminiApiKeys,
         models: appConfig.geminiModels,
@@ -128,7 +131,7 @@ async function recordConversationStats(req, mode, result) {
         });
     }
     catch (err) {
-        console.warn("[stats] Conversation stats not recorded:", err.message || err);
+        logger_js_1.logger.warn("Conversation stats not recorded", { error: (err?.message || String(err)) });
     }
 }
 async function generateChatResult(message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed = false, renderedProductIds = []) {
@@ -143,7 +146,7 @@ async function generateChatResult(message, extraFields, history, productId, conv
         }
     }
     catch (err) {
-        console.error("Gemini chat error:", err.message);
+        logger_js_1.logger.error("Gemini chat error", { error: err.message });
         fullReply = "Desole, une erreur est survenue. Veuillez reessayer.";
     }
     const visibleReply = (0, reply_sanitize_js_1.sanitizeAssistantReply)(fullReply);
@@ -157,7 +160,7 @@ async function generateChatResult(message, extraFields, history, productId, conv
         normalized.statut = statuses[0];
         const missing = missingOrderFields(normalized);
         if (missing.length > 0) {
-            console.warn(`[orders] Incomplete order ignored. Missing: ${missing.join(", ")}`);
+            logger_js_1.logger.warn(`Incomplete order ignored. Missing: ${missing.join(", ")}`);
             orderValidationReply =
                 "Il me manque encore quelques informations pour enregistrer la commande : " +
                     missing.join(", ") +
@@ -181,7 +184,7 @@ async function generateChatResult(message, extraFields, history, productId, conv
         const mentionedIds = productNameInMessage(message, products);
         const filtered = productList.filter((p) => !renderedProductIds.includes(p.id) || mentionedIds.has(p.id));
         if (filtered.length !== productList.length) {
-            console.log(`[DEDUP] filtered ${productList.length - filtered.length} already-rendered products`);
+            logger_js_1.logger.info(`filtered ${productList.length - filtered.length} already-rendered products`);
             productList.splice(0, productList.length, ...filtered);
         }
     }
@@ -203,10 +206,81 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
     });
-    const result = await generateChatResult(message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed, renderedProductIds);
+    const reqAborted = () => req.destroyed;
+    const { apiKeys, models, products, statuses, systemPrompt: dbSystemPrompt, catalogItemTemplate } = await getConfig();
+    const catalog = catalogProducts(products);
+    const systemPrompt = (0, prompt_js_1.getSystemPrompt)(catalog, dbSystemPrompt, catalogItemTemplate, productType);
+    // Phase 1: stream Gemini tokens immediately
+    let fullReply = "";
+    try {
+        const stream = (0, gemini_js_1.chatGeminiRequestStream)(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, models);
+        for await (const chunk of stream) {
+            if (reqAborted()) {
+                res.end();
+                return;
+            }
+            fullReply += chunk;
+            res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+        }
+    }
+    catch (err) {
+        logger_js_1.logger.error("Gemini chat error", { error: err.message });
+        if (!fullReply) {
+            fullReply = "Desole, une erreur est survenue. Veuillez reessayer.";
+            res.write(`data: ${JSON.stringify({ text: fullReply })}\n\n`);
+        }
+    }
+    // Phase 2: process order + products
+    const visibleReply = (0, reply_sanitize_js_1.sanitizeAssistantReply)(fullReply);
+    const { cleanReply, orderData } = (0, orders_js_1.detectOrderFromReply)(visibleReply);
+    let savedOrder = null;
+    let orderValidationReply = "";
+    if (orderData) {
+        const normalized = (0, orders_js_1.normalizeOrderPayload)(orderData);
+        normalized.id = (0, orders_js_1.generateOrderId)();
+        normalized.date = new Date().toISOString();
+        normalized.statut = statuses[0];
+        const missing = missingOrderFields(normalized);
+        if (missing.length > 0) {
+            logger_js_1.logger.warn(`Incomplete order ignored. Missing: ${missing.join(", ")}`);
+            orderValidationReply =
+                "Il me manque encore quelques informations pour enregistrer la commande : " +
+                    missing.join(", ") +
+                    ". Peux-tu me les envoyer ?";
+        }
+        else {
+            const productPriceRefs = products.map((p) => ({ name: p.name, price: p.price, id: p.id }));
+            (0, orders_js_1.applyOrderAmounts)(normalized, productPriceRefs);
+            const saved = await (0, orders_js_1.saveOrderWithoutDuplicate)(normalized, statuses, productPriceRefs);
+            savedOrder = (0, orders_js_1.orderResponse)(saved.order, saved.created);
+        }
+    }
+    const reply = stripPrematureUpsell(orderValidationReply || cleanReply || visibleReply, message, orderConfirmed, Boolean(savedOrder));
+    const { productData, productList } = (0, orders_js_1.detectProductsFromReply)(reply, products, {
+        productId,
+        productType,
+        userMessage: recentConversationText(history, message),
+    });
+    if (renderedProductIds.length > 0 && productList.length > 0) {
+        const mentionedIds = productNameInMessage(message, products);
+        const filtered = productList.filter((p) => !renderedProductIds.includes(p.id) || mentionedIds.has(p.id));
+        if (filtered.length !== productList.length) {
+            logger_js_1.logger.info(`filtered ${productList.length - filtered.length} already-rendered products`);
+            productList.splice(0, productList.length, ...filtered);
+        }
+    }
+    // Strip RENDER_PRODUCT tags from what the user sees (they were streamed with them)
+    let replyForClient = fullReply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+    if (productList.length === 0) {
+        replyForClient = replyForClient
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+            .replace(/\[[^\]]+\]/g, "")
+            .replace(/\s{2,}/g, " ")
+            .trim();
+    }
+    const result = { reply: replyForClient, order: savedOrder, product: productData, products: productList };
     await recordConversationStats(req, conversationMode, result);
-    res.write(`data: ${JSON.stringify({ text: result.reply })}\n\n`);
-    res.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true, reply: result.reply, order: result.order, product: result.product, products: result.products })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
 }
@@ -254,7 +328,7 @@ exports.chatRouter.post("/", async (req, res) => {
                 error: err.errors.map((issue) => issue.message).join(", "),
             });
         }
-        console.error("Chat error:", err);
+        logger_js_1.logger.error("Chat error", { error: (err instanceof Error ? err.message : String(err)) });
         res.status(500).json({ error: "Erreur interne du serveur" });
     }
 });
@@ -276,14 +350,18 @@ exports.chatRouter.post("/voice", upload.single("audio"), async (req, res) => {
             try {
                 history = JSON.parse(req.body.history);
             }
-            catch { }
+            catch {
+                logger_js_1.logger.warn("Invalid history JSON");
+            }
         }
         let renderedProductIds = [];
         if (req.body.renderedProductIds) {
             try {
                 renderedProductIds = JSON.parse(req.body.renderedProductIds);
             }
-            catch { }
+            catch {
+                logger_js_1.logger.warn("Invalid renderedProductIds JSON");
+            }
         }
         const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
         const wantsStream = req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
@@ -296,7 +374,7 @@ exports.chatRouter.post("/voice", upload.single("audio"), async (req, res) => {
         res.json(result);
     }
     catch (err) {
-        console.error("Voice chat error:", err);
+        logger_js_1.logger.error("Voice chat error", { error: (err instanceof Error ? err.message : String(err)) });
         res.status(500).json({ error: "Erreur interne du serveur" });
     }
 });

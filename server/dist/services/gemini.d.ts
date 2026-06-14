@@ -17,7 +17,7 @@ interface ChatMessage {
     audioMimeType?: string;
 }
 export declare function buildContents(messages: ChatMessage[]): GeminiContent[];
-export declare function callGemini(apiKey: string, model: string, contents: GeminiContent[], systemPrompt: string, onChunk?: (chunk: string) => void): Promise<string>;
+export declare function callGemini(apiKey: string, model: string, contents: GeminiContent[], systemPrompt: string): Promise<string>;
 export declare class GeminiError extends Error {
     statusCode: number;
     constructor(message: string, statusCode: number);

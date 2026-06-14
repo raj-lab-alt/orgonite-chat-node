@@ -13,8 +13,15 @@ async function requireAdmin(req, res, next) {
         req.user = { role: "admin" };
         return next();
     }
-    const { data: { user }, error, } = await supabase_js_1.supabase.auth.getUser(token);
-    if (error || !user) {
+    let user;
+    try {
+        const result = await supabase_js_1.supabase.auth.getUser(token);
+        user = result.data?.user;
+    }
+    catch {
+        return res.status(503).json({ error: "Service indisponible" });
+    }
+    if (!user) {
         return res.status(401).json({ error: "Non autorise" });
     }
     if (!(0, admin_auth_js_1.isSupabaseAdminUser)(user)) {

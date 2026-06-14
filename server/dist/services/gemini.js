@@ -44,73 +44,60 @@ async function parseGeminiError(response) {
     }
     return new GeminiError(message, response.status);
 }
-async function callGemini(apiKey, model, contents, systemPrompt, onChunk) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
-    if (onChunk) {
-        // Streaming mode
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                system_instruction: { parts: [{ text: systemPrompt }] },
-                contents,
-                generationConfig: { temperature: 0.7 },
-            }),
-        });
-        if (!response.ok) {
-            throw await parseGeminiError(response);
-        }
-        const reader = response.body?.getReader();
-        if (!reader)
-            throw new Error("No response body");
-        const decoder = new TextDecoder();
-        let buffer = "";
-        let fullText = "";
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done)
-                break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-            for (const line of lines) {
-                if (line.startsWith("data: ")) {
-                    const jsonStr = line.slice(6).trim();
-                    if (!jsonStr || jsonStr === "[DONE]")
-                        continue;
-                    try {
-                        const data = JSON.parse(jsonStr);
-                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                        if (text) {
-                            fullText += text;
-                            onChunk(text);
-                        }
-                    }
-                    catch {
-                        // skip malformed SSE
-                    }
+async function* callGeminiStream(apiKey, model, contents, systemPrompt) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+    const headers = {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+    };
+    const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents,
+            generationConfig: { temperature: 0.7 },
+        }),
+    });
+    if (!response.ok) {
+        throw await parseGeminiError(response);
+    }
+    const reader = response.body?.getReader();
+    if (!reader)
+        throw new Error("No response body");
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done)
+            break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+            if (line.startsWith("data: ")) {
+                const jsonStr = line.slice(6).trim();
+                if (!jsonStr || jsonStr === "[DONE]")
+                    continue;
+                try {
+                    const data = JSON.parse(jsonStr);
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                    if (text)
+                        yield text;
+                }
+                catch {
+                    // skip malformed SSE
                 }
             }
         }
-        return fullText;
     }
-    else {
-        // Non-streaming
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                system_instruction: { parts: [{ text: systemPrompt }] },
-                contents,
-                generationConfig: { temperature: 0.7 },
-            }),
-        });
-        if (!response.ok) {
-            throw await parseGeminiError(response);
-        }
-        const data = await response.json();
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+async function callGemini(apiKey, model, contents, systemPrompt) {
+    let fullText = "";
+    for await (const chunk of callGeminiStream(apiKey, model, contents, systemPrompt)) {
+        fullText += chunk;
     }
+    return fullText;
 }
 class GeminiError extends Error {
     statusCode;
@@ -165,12 +152,9 @@ async function* chatGeminiRequestStream(message, extraFields, history, productId
             const keyIdx = (state.currentKeyIndex + ki) % apiKeys.length;
             const apiKey = apiKeys[keyIdx];
             try {
-                let fullText = "";
-                const stream = callGemini(apiKey, model, contents, systemPrompt, (chunk) => {
-                    fullText += chunk;
-                });
-                const result = await stream;
-                yield result;
+                for await (const chunk of callGeminiStream(apiKey, model, contents, systemPrompt)) {
+                    yield chunk;
+                }
                 return;
             }
             catch (err) {

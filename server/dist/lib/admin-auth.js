@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.adminPassword = adminPassword;
 exports.adminToken = adminToken;
 exports.isAdminToken = isAdminToken;
+exports.verifyAdminPassword = verifyAdminPassword;
 exports.isSupabaseAdminUser = isSupabaseAdminUser;
 const crypto_1 = require("crypto");
 function adminPassword() {
@@ -26,6 +27,13 @@ function isAdminToken(token) {
     if (!expected || token.length !== expected.length)
         return false;
     return (0, crypto_1.timingSafeEqual)(Buffer.from(token), Buffer.from(expected));
+}
+function verifyAdminPassword(password) {
+    const configured = adminPassword();
+    if (!configured)
+        return false;
+    const hash = (pw) => (0, crypto_1.createHash)("sha256").update(pw).digest();
+    return (0, crypto_1.timingSafeEqual)(hash(password), hash(configured));
 }
 function isSupabaseAdminUser(user) {
     const role = user?.app_metadata?.role || user?.user_metadata?.role;

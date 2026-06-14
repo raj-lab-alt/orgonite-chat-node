@@ -8,6 +8,8 @@ const fs_1 = require("fs");
 const path_1 = require("path");
 const supabase_js_1 = require("./supabase.js");
 const legacy_config_js_1 = require("./legacy-config.js");
+const cache_js_1 = require("./cache.js");
+const logger_js_1 = require("./logger.js");
 const DEFAULT_CATALOG_TEMPLATE = "{n}. {name} [RENDER_PRODUCT:{id}] : {benefits} Composition : {composition}{taille} Taille : {taille}.{/taille} Prix : {price} {currency}.";
 exports.DEFAULT_STATUSES = [
     "attente de confirm tel",
@@ -94,7 +96,7 @@ function configToRow(config) {
 function maskApiKeys(apiKeys) {
     return apiKeys.map(() => "***");
 }
-async function getAppConfig() {
+async function fetchAppConfig() {
     const fallback = fallbackConfig();
     const { data, error } = await supabase_js_1.supabase
         .from("app_config")
@@ -102,7 +104,7 @@ async function getAppConfig() {
         .eq("id", true)
         .maybeSingle();
     if (error) {
-        console.error("[app-config] Falling back to seed config:", error.message);
+        logger_js_1.logger.warn("Falling back to seed config", { error: error.message });
         return fallback;
     }
     if (data)
@@ -124,10 +126,13 @@ async function getAppConfig() {
         .select()
         .single();
     if (insertError) {
-        console.error("[app-config] Failed to seed database config:", insertError.message);
+        logger_js_1.logger.error("Failed to seed database config", { error: insertError.message });
         return fallback;
     }
     return rowToConfig(inserted, fallback);
+}
+async function getAppConfig() {
+    return (0, cache_js_1.memoize)("app:config", fetchAppConfig, 30_000);
 }
 async function updateAppConfig(update) {
     const row = configToRow(update);
@@ -141,6 +146,7 @@ async function updateAppConfig(update) {
         .single();
     if (error)
         throw error;
+    (0, cache_js_1.cacheDel)("app:config");
     return rowToConfig(data, existing);
 }
 //# sourceMappingURL=app-config.js.map

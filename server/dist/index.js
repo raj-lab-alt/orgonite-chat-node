@@ -102,6 +102,19 @@ if ((0, fs_1.existsSync)(clientDist)) {
             res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
         });
     }
+    app.get("/debug", (_req, res) => {
+        res.json({
+            servingFrom: clientDist,
+            reactBuild: reactExists,
+            cwd: process.cwd(),
+            dirname: __dirname,
+            reactDist,
+            legacyDist,
+            distExists: (0, fs_1.existsSync)(clientDist),
+            reactDistExists: (0, fs_1.existsSync)(reactDist),
+            legacyDistExists: (0, fs_1.existsSync)(legacyDist),
+        });
+    });
     app.use((_req, res) => {
         res.sendFile((0, path_1.resolve)(clientDist, "index.html"));
     });

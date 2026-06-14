@@ -6,6 +6,7 @@ exports.getLegacyServices = getLegacyServices;
 exports.getLegacyStatuses = getLegacyStatuses;
 const fs_1 = require("fs");
 const path_1 = require("path");
+const logger_js_1 = require("../lib/logger.js");
 let cachedConfig = null;
 function getLegacyConfig() {
     if (cachedConfig)
@@ -20,7 +21,7 @@ function getLegacyConfig() {
         cachedConfig = JSON.parse(rawConfig);
     }
     catch (err) {
-        console.error("[legacy-config] Failed to read legacy config:", err);
+        logger_js_1.logger.error("Failed to read legacy config", { error: (err instanceof Error ? err.message : String(err)) });
         cachedConfig = {};
     }
     return cachedConfig ?? {};

@@ -1,0 +1,1 @@
+{"version":3,"file":"admin-ws.d.ts","sourceRoot":"","sources":["../../src/lib/admin-ws.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,eAAe,EAAa,MAAM,IAAI,CAAC;AAChD,OAAO,EAAE,MAAM,EAAE,MAAM,MAAM,CAAC;AAM9B,wBAAgB,WAAW,CAAC,MAAM,EAAE,MAAM,GAAG,eAAe,CAc3D;AAED,wBAAgB,YAAY,IAAI,IAAI,CAMnC;AAED,wBAAgB,cAAc,CAAC,KAAK,EAAE,MAAM,EAAE,IAAI,EAAE,OAAO,GAAG,IAAI,CAUjE"}
