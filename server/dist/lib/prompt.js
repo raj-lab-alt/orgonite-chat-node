@@ -88,23 +88,26 @@ Ces donnees sont indispensables pour fabriquer la piece. Si une seule manque, de
     const etatTrackingAddendum = `
 
 [ETAT - TRACKING DE CONVERSATION - REGLE OBLIGATOIRE]
-Tu DOIS commencer chaque reponse par le bloc [ETAT] ci-dessous avec les champs mis a jour selon la conversation :
+Tu DOIS commencer chaque reponse EXACTEMENT comme ceci :
 
-[ETAT] {lang}=fr|darija_latin|arabe | {mode}=A|B|C | {type}=protection|spiritual|love|abundance|islamic|accessory|custom | {intent}=decouverte|info|achat|suivi | {prenom}=? | {besoin}=? | {outil_cible}=? | {prix_dit}=non|oui | {order_confirmed_flag}=non|saisie|confirme | {tel}=? | {tel_raw}=? | {doublon}=non|oui
+[ETAT] {lang}=fr | {mode}=A | {type}=protection | {intent}=decouverte | {prenom}=? | {besoin}=? | {outil_cible}=? | {prix_dit}=non | {order_confirmed_flag}=non | {tel}=? | {tel_raw}=? | {doublon}=non
 [LANGUE] {lang}=fr
 -----
 
-Regles :
-1. Chaque champ {variable}=valeur doit etre mis a jour a chaque reponse selon les dires du client.
-2. Met "?" si la valeur est encore inconnue.
-3. {lang} reflete la langue utilisee par le prospect (fr / darija_latin / arabe).
-4. {mode} correspond au mode de conversation (A=accueil, B=produit, C=personnalise).
-5. {intent} detecte l'intention du prospect.
-6. {prenom} des que le client donne son prenom.
-7. {besoin} resume le besoin exprime.
-8. {prix_dit} = oui des que le budget est aborde.
-9. {order_confirmed_flag} = saisi des que les infos de livraison sont donnees, confirme une fois la commande passee.
-10. {doublon} = oui si le client est deja client.
+Les champs {variable}= valeur (avec les accolades) doivent etre mis a jour a chaque reponse.
+Valeurs possibles pour chaque champ :
+- {lang} : fr, darija_latin ou arabe (selon la langue du prospect)
+- {mode} : A (accueil), B (produit), C (personnalise)
+- {type} : protection, spiritual, love, abundance, islamic, accessory ou custom
+- {intent} : decouverte, info, achat ou suivi
+- {prenom} : le prenom du client, ? si inconnu
+- {besoin} : le besoin exprime par le client
+- {outil_cible} : l'outil qui interesse le client
+- {prix_dit} : non ou oui (des que le budget est aborde)
+- {order_confirmed_flag} : non, saisie ou confirme
+- {tel} : telephone, ? si inconnu
+- {tel_raw} : telephone brut, ? si inconnu
+- {doublon} : non ou oui (deja client)
 
 Le bloc [ETAT] est visible par le client. Ecris-le correctement formatted.
 
