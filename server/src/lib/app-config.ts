@@ -51,18 +51,8 @@ function nonEmptyString(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value : fallback;
 }
 
-const KNOWN_GEMINI_MODELS = new Set([
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
-  "gemini-1.0-pro",
-]);
-
 function validGeminiModels(models: string[]): string[] {
-  const valid = models.filter((m) => KNOWN_GEMINI_MODELS.has(m));
+  const valid = models.filter((m) => /^gemini-/.test(m));
   return valid.length > 0 ? valid : ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 }
 
