@@ -4,6 +4,7 @@ exports.GeminiError = void 0;
 exports.buildContents = buildContents;
 exports.callGemini = callGemini;
 exports.chatGeminiRequestStream = chatGeminiRequestStream;
+const gemini_stats_js_1 = require("./gemini-stats.js");
 function buildContents(messages) {
     const contents = [];
     for (const msg of messages) {
@@ -44,7 +45,7 @@ async function parseGeminiError(response) {
     }
     return new GeminiError(message, response.status);
 }
-async function* callGeminiStream(apiKey, model, contents, systemPrompt) {
+async function* callGeminiStream(apiKey, model, contents, systemPrompt, signal) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
     const headers = {
         "Content-Type": "application/json",
@@ -58,6 +59,7 @@ async function* callGeminiStream(apiKey, model, contents, systemPrompt) {
             contents,
             generationConfig: { temperature: 0.7 },
         }),
+        signal,
     });
     if (!response.ok) {
         throw await parseGeminiError(response);
@@ -108,6 +110,36 @@ class GeminiError extends Error {
     }
 }
 exports.GeminiError = GeminiError;
+let globalKeyIndex = 0;
+async function firstSuccess(promises) {
+    return new Promise((resolve, reject) => {
+        if (promises.length === 0)
+            reject(new Error("No promises"));
+        let failures = 0;
+        for (const p of promises) {
+            p.then(resolve, () => {
+                failures++;
+                if (failures === promises.length)
+                    reject(new Error("All promises failed"));
+            });
+        }
+    });
+}
+async function takeFirstChunk(stream) {
+    try {
+        const { value, done } = await stream.next();
+        if (done)
+            return null;
+        async function* rest() {
+            yield value;
+            yield* stream;
+        }
+        return { firstChunk: value, rest: rest() };
+    }
+    catch {
+        return null;
+    }
+}
 async function* chatGeminiRequestStream(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, models) {
     if (!apiKeys.length)
         throw new Error("Aucune cle API Gemini configuree.");
@@ -140,41 +172,65 @@ async function* chatGeminiRequestStream(message, extraFields, history, productId
         }),
     });
     const contents = buildContents(messages);
-    let lastErr = null;
-    const state = {
-        currentKeyIndex: 0,
-        currentModelIndex: 0,
-    };
-    for (let mi = 0; mi < models.length; mi++) {
-        const modelIdx = (state.currentModelIndex + mi) % models.length;
-        const model = models[modelIdx];
-        for (let ki = 0; ki < apiKeys.length; ki++) {
-            const keyIdx = (state.currentKeyIndex + ki) % apiKeys.length;
-            const apiKey = apiKeys[keyIdx];
-            try {
-                for await (const chunk of callGeminiStream(apiKey, model, contents, systemPrompt)) {
-                    yield chunk;
-                }
-                return;
-            }
-            catch (err) {
-                const code = err.statusCode || 500;
-                const msg = err.message?.toLowerCase() || "";
-                const isRateLimit = code === 429 || code === 503;
-                const keyError = msg.includes("api key") || msg.includes("permission") || code === 401 || code === 403;
-                const modelFallback = msg.includes("model") || msg.includes("not found") || msg.includes("not supported");
-                const mediaUnsupported = msg.includes("does not support") || msg.includes("cannot read");
-                if (isRateLimit || mediaUnsupported || keyError || modelFallback) {
-                    lastErr = err;
-                    continue;
-                }
-                throw err;
-            }
+    // Key rotation: pick next key in round-robin
+    const keyIndex = globalKeyIndex++ % apiKeys.length;
+    const apiKey = apiKeys[keyIndex];
+    // Launch all models in parallel with the chosen key
+    const controllers = models.map(() => new AbortController());
+    const startTimes = new Array(models.length);
+    const streams = models.map((model, i) => callGeminiStream(apiKey, model, contents, systemPrompt, controllers[i].signal));
+    // Race for first chunk across all models
+    const firstChunkPromises = streams.map(async (stream, i) => {
+        startTimes[i] = Date.now();
+        const result = await takeFirstChunk(stream);
+        if (!result)
+            throw new Error("Empty stream");
+        return { ...result, index: i, latencyMs: Date.now() - startTimes[i] };
+    });
+    // Prevent unhandled rejections from losers that get aborted
+    for (const p of firstChunkPromises)
+        p.catch(() => { });
+    let winner;
+    try {
+        winner = await firstSuccess(firstChunkPromises);
+    }
+    catch {
+        controllers.forEach(c => { try {
+            c.abort();
         }
+        catch { } });
+        for (let i = 0; i < models.length; i++) {
+            (0, gemini_stats_js_1.recordAttempt)({
+                model: models[i],
+                keyIndex,
+                success: false,
+                winner: false,
+                latencyMs: startTimes[i] ? Date.now() - startTimes[i] : 0,
+            });
+        }
+        throw new Error("Tous les modeles ont echoue");
     }
-    if (lastErr) {
-        throw lastErr;
+    // Abort all loser models
+    controllers.forEach((c, i) => { if (i !== winner.index) {
+        try {
+            c.abort();
+        }
+        catch { }
+    } });
+    // Record stats: winner is success, losers are non-success (aborted)
+    for (let i = 0; i < models.length; i++) {
+        (0, gemini_stats_js_1.recordAttempt)({
+            model: models[i],
+            keyIndex,
+            success: i === winner.index,
+            winner: i === winner.index,
+            latencyMs: i === winner.index ? winner.latencyMs : (startTimes[i] ? Date.now() - startTimes[i] : 0),
+        });
     }
-    throw new Error("No available Gemini key/model combination.");
+    // Yield from winner
+    yield winner.firstChunk;
+    for await (const chunk of winner.rest) {
+        yield chunk;
+    }
 }
 //# sourceMappingURL=gemini.js.map

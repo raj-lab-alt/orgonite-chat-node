@@ -46,6 +46,7 @@ export default function ChatPage({ showProductHero = false, product: propProduct
   const [welcomeProduct, setWelcomeProduct] = useState<any>(null);
   const [welcomeDone, setWelcomeDone] = useState(false);
   const [error, setError] = useState("");
+  const [focusKey, setFocusKey] = useState(0);
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [allServices, setAllServices] = useState<any[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
@@ -314,6 +315,20 @@ export default function ChatPage({ showProductHero = false, product: propProduct
               {(propProduct?.description || welcomeProduct?.description) && (
                 <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">{propProduct?.description || welcomeProduct?.description}</p>
               )}
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => handleOrderProduct(propProduct?.name || welcomeProduct?.name || "")}
+                  className="flex-1 bg-primary text-primary-foreground rounded-xl py-2.5 font-semibold text-sm hover:bg-primary/90 transition-colors"
+                >
+                  Commander
+                </button>
+                <button
+                  onClick={() => setFocusKey(k => k + 1)}
+                  className="flex-1 bg-muted text-foreground border border-primary/15 rounded-xl py-2.5 font-semibold text-sm hover:bg-muted/80 transition-colors"
+                >
+                  Poser une question a Amine
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -437,6 +452,7 @@ export default function ChatPage({ showProductHero = false, product: propProduct
           onSend={handleSend}
           onStartVoice={() => setShowAudio(true)}
           isStreaming={isStreaming}
+          focusKey={focusKey}
         />
       )}
     </div>

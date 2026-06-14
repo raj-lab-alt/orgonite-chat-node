@@ -134,6 +134,15 @@ export function deleteService(id: string) {
   });
 }
 
+// --- Gemini Stats ---
+export function getGeminiStats() {
+  return apiFetch<{ models: any[]; keys: any[]; totalRequests: number }>("/api/admin/gemini-stats");
+}
+
+export function clearGeminiStats() {
+  return apiFetch<{ success: boolean }>("/api/admin/gemini-stats/clear", { method: "POST" });
+}
+
 // --- Orders ---
 export function getOrders(includeTrash = false) {
   const qs = includeTrash ? "?includeTrash=1" : "";

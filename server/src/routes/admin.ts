@@ -5,6 +5,7 @@ import { requireAdmin } from "../middleware/auth.js";
 import { adminPassword, adminToken, isSupabaseAdminUser, verifyAdminPassword } from "../lib/admin-auth.js";
 import { getAppConfig, maskApiKeys, updateAppConfig } from "../lib/app-config.js";
 import { logger } from "../lib/logger.js";
+import { getModelStats, clearStats } from "../services/gemini-stats.js";
 
 const configSchema = z.object({
   systemPrompt: z.string().min(1).max(50000).optional(),
@@ -219,6 +220,15 @@ adminRouter.get("/stats", requireAdmin, async (req: Request, res: Response) => {
     logger.error("Stats error", { error: err.message });
     res.status(500).json({ error: "Erreur lors du chargement des statistiques" });
   }
+});
+
+adminRouter.get("/gemini-stats", requireAdmin, (_req: Request, res: Response) => {
+  res.json(getModelStats());
+});
+
+adminRouter.post("/gemini-stats/clear", requireAdmin, (_req: Request, res: Response) => {
+  clearStats();
+  res.json({ success: true });
 });
 
 adminRouter.post("/migrate-schema", requireAdmin, async (_req: Request, res: Response) => {

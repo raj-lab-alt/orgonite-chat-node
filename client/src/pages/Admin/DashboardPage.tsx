@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getStats } from "@/lib/admin-api";
+import { getStats, getGeminiStats, clearGeminiStats } from "@/lib/admin-api";
 
 interface Stats {
   period: number;
@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
+  const [geminiStats, setGeminiStats] = useState<any>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -21,6 +22,14 @@ export default function DashboardPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [days]);
+
+  useEffect(() => {
+    getGeminiStats().then(setGeminiStats).catch(() => {});
+    const interval = setInterval(() => {
+      getGeminiStats().then(setGeminiStats).catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (loading) {
     return (
@@ -141,6 +150,80 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Gemini model & key stats */}
+      {geminiStats && (
+        <div className="rounded-xl border bg-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">Modeles & cles Gemini</h2>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span>{geminiStats.totalRequests} requetes</span>
+              <button
+                onClick={() => {
+                  clearGeminiStats().then(() => {
+                    setGeminiStats({ models: [], keys: [], totalRequests: 0 });
+                  });
+                }}
+                className="text-destructive hover:underline"
+              >
+                Reinitialiser
+              </button>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Per-model stats */}
+            <div>
+              <h3 className="text-sm font-medium mb-2">Par modele</h3>
+              <div className="space-y-1 text-sm">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
+                  <span className="flex-1">Modele</span>
+                  <span className="w-12 text-right">Req.</span>
+                  <span className="w-12 text-right">Succes</span>
+                  <span className="w-12 text-right">Gagne</span>
+                  <span className="w-16 text-right">Latence</span>
+                </div>
+                {(geminiStats.models || []).map((m: any) => (
+                  <div key={m.model} className="flex items-center gap-2">
+                    <span className="flex-1 truncate text-xs">{m.model}</span>
+                    <span className="w-12 text-right text-xs">{m.requests}</span>
+                    <span className="w-12 text-right text-xs" style={{ color: m.successRate >= 80 ? "#22c55e" : m.successRate >= 50 ? "#eab308" : "#ef4444" }}>{m.successRate}%</span>
+                    <span className="w-12 text-right text-xs">{m.winRate}%</span>
+                    <span className="w-16 text-right text-xs">{m.avgLatencyMs}ms</span>
+                  </div>
+                ))}
+                {(!geminiStats.models || geminiStats.models.length === 0) && (
+                  <p className="text-xs text-muted-foreground">Aucune donnee</p>
+                )}
+              </div>
+            </div>
+
+            {/* Per-key stats */}
+            <div>
+              <h3 className="text-sm font-medium mb-2">Par cle</h3>
+              <div className="space-y-1 text-sm">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground font-medium pb-1 border-b">
+                  <span className="flex-1">Cle #</span>
+                  <span className="w-12 text-right">Req.</span>
+                  <span className="w-12 text-right">Succes</span>
+                  <span className="w-16 text-right">Latence</span>
+                </div>
+                {(geminiStats.keys || []).map((k: any) => (
+                  <div key={k.keyIndex} className="flex items-center gap-2">
+                    <span className="flex-1 text-xs">Cle #{k.keyIndex + 1}</span>
+                    <span className="w-12 text-right text-xs">{k.requests}</span>
+                    <span className="w-12 text-right text-xs" style={{ color: k.successRate >= 80 ? "#22c55e" : k.successRate >= 50 ? "#eab308" : "#ef4444" }}>{k.successRate}%</span>
+                    <span className="w-16 text-right text-xs">{k.avgLatencyMs}ms</span>
+                  </div>
+                ))}
+                {(!geminiStats.keys || geminiStats.keys.length === 0) && (
+                  <p className="text-xs text-muted-foreground">Aucune donnee</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

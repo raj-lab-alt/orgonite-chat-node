@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Image, Mic, Send, Square } from "lucide-react";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -8,13 +8,18 @@ interface ChatInputProps {
   onStartVoice: () => void;
   isStreaming: boolean;
   disabled?: boolean;
+  focusKey?: number;
 }
 
-export function ChatInput({ onSend, onStartVoice, isStreaming, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onStartVoice, isStreaming, disabled, focusKey }: ChatInputProps) {
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<{ data: string; mime: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [focusKey]);
 
   const handleSubmit = () => {
     const trimmed = text.trim();

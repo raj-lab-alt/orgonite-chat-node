@@ -41,6 +41,7 @@ const auth_js_1 = require("../middleware/auth.js");
 const admin_auth_js_1 = require("../lib/admin-auth.js");
 const app_config_js_1 = require("../lib/app-config.js");
 const logger_js_1 = require("../lib/logger.js");
+const gemini_stats_js_1 = require("../services/gemini-stats.js");
 const configSchema = zod_1.z.object({
     systemPrompt: zod_1.z.string().min(1).max(50000).optional(),
     catalogItemTemplate: zod_1.z.string().min(1).max(10000).optional(),
@@ -241,6 +242,13 @@ exports.adminRouter.get("/stats", auth_js_1.requireAdmin, async (req, res) => {
         logger_js_1.logger.error("Stats error", { error: err.message });
         res.status(500).json({ error: "Erreur lors du chargement des statistiques" });
     }
+});
+exports.adminRouter.get("/gemini-stats", auth_js_1.requireAdmin, (_req, res) => {
+    res.json((0, gemini_stats_js_1.getModelStats)());
+});
+exports.adminRouter.post("/gemini-stats/clear", auth_js_1.requireAdmin, (_req, res) => {
+    (0, gemini_stats_js_1.clearStats)();
+    res.json({ success: true });
 });
 exports.adminRouter.post("/migrate-schema", auth_js_1.requireAdmin, async (_req, res) => {
     try {
