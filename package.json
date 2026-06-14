@@ -3,6 +3,7 @@
   "private": true,
   "main": "server/dist/index.js",
   "scripts": {
+    "postinstall": "npm --prefix client install",
     "dev": "concurrently -k -n server,client -c blue,green \"npx tsx watch server/src/index.ts\" \"npm --prefix client run dev\"",
     "build": "node scripts/build-legacy-client.cjs && npx tsc -p server/tsconfig.json",
     "start": "node server.js",
