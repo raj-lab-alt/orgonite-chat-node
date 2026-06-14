@@ -82,13 +82,12 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 
 const clientDist = resolve(__dirname, "../../client/dist");
 if (existsSync(clientDist)) {
+  app.get("/admin", (_req, res) => {
+    res.sendFile(resolve(clientDist, "index.html"));
+  });
   app.use(express.static(clientDist));
-  app.use((req, res, next) => {
-    if (!req.path.startsWith("/api") && req.method === "GET") {
-      res.sendFile(resolve(clientDist, "index.html"));
-    } else {
-      next();
-    }
+  app.use((_req, res) => {
+    res.sendFile(resolve(clientDist, "index.html"));
   });
 }
 
