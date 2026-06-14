@@ -148,36 +148,7 @@ export class GeminiError extends Error {
 }
 
 let globalKeyIndex = 0;
-
-async function firstSuccess<T>(promises: Promise<T>[]): Promise<T> {
-  return new Promise((resolve, reject) => {
-    if (promises.length === 0) reject(new Error("No promises"));
-    let failures = 0;
-    for (const p of promises) {
-      p.then(resolve, () => {
-        failures++;
-        if (failures === promises.length)
-          reject(new Error("All promises failed"));
-      });
-    }
-  });
-}
-
-async function takeFirstChunk(
-  stream: AsyncGenerator<string>
-): Promise<{ firstChunk: string; rest: AsyncGenerator<string> } | null> {
-  try {
-    const { value, done } = await stream.next();
-    if (done) return null;
-    async function* rest() {
-      yield value;
-      yield* stream;
-    }
-    return { firstChunk: value, rest: rest() };
-  } catch {
-    return null;
-  }
-}
+let globalModelIndex = 0;
 
 export async function* chatGeminiRequestStream(
   message: string,
@@ -234,78 +205,52 @@ export async function* chatGeminiRequestStream(
 
   const contents = buildContents(messages);
 
-  // Key rotation: pick next key in round-robin
-  const keyIndex = globalKeyIndex++ % apiKeys.length;
-  const apiKey = apiKeys[keyIndex];
+  // Sequential retry across models with key rotation per attempt
+  // One request per message to avoid rate limiting
+  let lastError: unknown;
+  let triedModels = 0;
+  for (let attempt = 0; attempt < models.length; attempt++) {
+    const modelIndex = globalModelIndex++ % models.length;
+    const model = models[modelIndex];
+    const keyIndex = globalKeyIndex++ % apiKeys.length;
+    const apiKey = apiKeys[keyIndex];
+    triedModels++;
 
-  // Launch all models in parallel with the chosen key
-  const controllers = models.map(() => new AbortController());
-  const startTimes = new Array<number>(models.length);
-  const streams = models.map((model, i) =>
-    callGeminiStream(apiKey, model, contents, systemPrompt, controllers[i].signal)
-  );
-
-  // Race for first chunk across all models
-  const firstChunkPromises = streams.map(async (stream, i) => {
-    startTimes[i] = Date.now();
-    const result = await takeFirstChunk(stream);
-    if (!result) throw new Error("Empty stream");
-    return { ...result, index: i, latencyMs: Date.now() - startTimes[i] };
-  });
-
-  // Prevent unhandled rejections from losers that get aborted
-  for (const p of firstChunkPromises) p.catch(() => {});
-
-  let winner: Awaited<(typeof firstChunkPromises)[number]>;
-
-  try {
-    winner = await firstSuccess(firstChunkPromises);
-  } catch (firstErr: any) {
-    controllers.forEach(c => { try { c.abort(); } catch {} });
-    for (let i = 0; i < models.length; i++) {
-      recordAttempt({
-        model: models[i],
-        keyIndex,
-        success: false,
-        winner: false,
-        latencyMs: startTimes[i] ? Date.now() - startTimes[i] : 0,
-      });
-    }
-
-    // All models failed — try refreshing the model list and retry once
+    const startTime = Date.now();
     try {
-      const newModels = await refreshModelList(apiKeys[0]);
-      const changed = newModels.length !== models.length ||
-        newModels.some((m, i) => m !== models[i]);
-      if (!changed) throw firstErr;
+      for await (const chunk of callGeminiStream(apiKey, model, contents, systemPrompt)) {
+        recordAttempt({
+          model, keyIndex, success: true, winner: true,
+          latencyMs: Date.now() - startTime,
+        });
+        yield chunk;
+      }
+      return; // success
+    } catch (err: any) {
+      lastError = err;
+      const latencyMs = Date.now() - startTime;
+      recordAttempt({
+        model, keyIndex, success: false, winner: false, latencyMs,
+      });
+      if (err.statusCode === 429) {
+        await new Promise(r => setTimeout(r, 1000));
+      }
+      continue;
+    }
+  }
 
+  // All models failed — try refreshing the model list and retry once
+  try {
+    const newModels = await refreshModelList(apiKeys[0]);
+    const changed = newModels.length !== models.length ||
+      newModels.some((m, i) => m !== models[i]);
+    if (changed) {
       logger.info(`Retrying with refreshed models: ${newModels.join(", ")}`);
       return yield* chatGeminiRequestStream(
         message, extraFields, history, productId, conversationMode,
         isVoice, productType, systemPrompt, apiKeys, newModels
       );
-    } catch {
-      throw firstErr;
     }
-  }
-
-  // Abort all loser models
-  controllers.forEach((c, i) => { if (i !== winner.index) { try { c.abort(); } catch {} } });
-
-  // Record stats: winner is success, losers are non-success (aborted)
-  for (let i = 0; i < models.length; i++) {
-    recordAttempt({
-      model: models[i],
-      keyIndex,
-      success: i === winner.index,
-      winner: i === winner.index,
-      latencyMs: i === winner.index ? winner.latencyMs : (startTimes[i] ? Date.now() - startTimes[i] : 0),
-    });
-  }
-
-  // Yield from winner
-  yield winner.firstChunk;
-  for await (const chunk of winner.rest) {
-    yield chunk;
-  }
+  } catch {}
+  throw lastError || new Error("Tous les modeles ont echoue.");
 }
