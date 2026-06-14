@@ -141,7 +141,6 @@ function setPageMeta(title, desc, image) {
 }
 
 async function renderPageProduct(slug) {
-  if (!productCatalog.length) await loadProductCatalog();
   const product = productCatalog.find(p => p.slug === slug || p.id === slug) || productCatalog[0];
   if (!product) { showChat(); return; }
   spaTitle.textContent = product.name || 'Produit';
@@ -430,34 +429,6 @@ let productCatalog = [
   { id:"orgonedisc_recharge", name:"OrgonDisc Fleur de Vie", price:50, currency:"DT", imageUrl:"https://orgonite-tunisie.com/wp-content/uploads/2026/04/17754938878cdc.webp", benefits:"Recharge et purifie tous vos bracelets en cristaux pendant votre sommeil. Compatible avec toutes les pierres (améthyste, labradorite, citrine, quartz rose, etc.). Ne nécessite pas de pierres supplémentaires. Intègre la Fleur de Vie pour une programmation d'intention vibratoire. ⌀ 12cm.", taille:"12 cm", accentColor:"#06b6d4", productType:"accessory", welcomeSequence:["Vous avez déjà des bracelets en pierres naturelles ? Saviez-vous qu'ils ont besoin d'être rechargés régulièrement pour garder leur puissance ?","Sans recharge, vos pierres perdent leur efficacité après quelques semaines.","Ce disque Fleur de Vie rechargera tous vos cristaux en une nuit. ✦"] },
   { id:"orgonite_perso", name:"Orgonite Personnalisée", price:76, currency:"DT", imageUrl:"https://orgonite-tunisie.com/wp-content/uploads/2026/05/perso.webp", benefits:"Composée sur mesure selon votre profil astrologique et numérologique. Analyse vibratoire personnalisée + feuille de profil + activation guidée. Prix selon format : 76 DT collier, 79 DT cône voiture, 89 DT dôme.", accentColor:"#d946ef", productType:"custom", welcomeSequence:["Vous êtes unique, votre protection也应该 l'être. Votre profil astrologique et numérologique révèle les pierres exactes dont vous avez besoin.","Chaque combinaison est calculée avec précision pour aligner votre énergie personnelle avec les cristaux.","Laissez-moi créer la pièce unique qui vous correspond. ✦"] }
 ];
-
-async function loadProductCatalog() {
-  const routeEl = document.getElementById('route-data');
-  if (routeEl) {
-    try {
-      const data = JSON.parse(routeEl.textContent);
-      if (Array.isArray(data.products) && data.products.length > 0) {
-        productCatalog = data.products.map(p => ({
-          ...p, price: Number(p.price) || 0, stock: Number(p.stock) || 10
-        }));
-        return;
-      }
-    } catch (e) {}
-  }
-  try {
-    const response = await fetchWithTimeout('/api/products', { cache: 'no-store' });
-    if (!response.ok) return;
-    const apiProducts = await response.json();
-    if (Array.isArray(apiProducts) && apiProducts.length > 0) {
-      productCatalog = apiProducts.map(p => ({
-        ...p, price: Number(p.price) || 0, stock: Number(p.stock) || 10
-      }));
-      return;
-    }
-  } catch (err) {
-    console.warn('Catalogue distant non chargé:', err);
-  }
-}
 
 let conversationHistory = [];
 let selectedImageData = null;
@@ -1795,9 +1766,6 @@ function createAmineBubble() {
 }
 
 async function renderAwaitCatalog(page, params) {
-  if (page === 'product' && !productCatalog.length) {
-    try { await loadProductCatalog(); } catch (e) { console.warn('catalog retry:', e); }
-  }
   if ((page === 'services' || page === 'service') && !servicesCache.length) {
     try { await loadServices(); } catch (e) { console.warn('services retry:', e); }
   }
@@ -1807,7 +1775,7 @@ async function renderAwaitCatalog(page, params) {
 async function initChat() {
   try {
     await Promise.race([
-      Promise.all([loadProductCatalog(), loadServices(), loadTrackingConfig()]),
+      Promise.all([loadServices(), loadTrackingConfig()]),
       new Promise(r => setTimeout(r, 5000))
     ]);
   } catch (e) { console.warn('Init error:', e); }
