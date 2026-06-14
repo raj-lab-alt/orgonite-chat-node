@@ -38,7 +38,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.chatRouter = void 0;
 const express_1 = require("express");
-const zod_1 = require("zod");
 const multer_1 = __importDefault(require("multer"));
 const supabase_js_1 = require("../lib/supabase.js");
 const prompt_js_1 = require("../lib/prompt.js");
@@ -395,57 +394,13 @@ exports.chatRouter.get("/diag", async (_req, res) => {
     }
 });
 // POST /api/chat — text + optional image
+// TEST: delayed response to check if Express 5 auto-next() is the issue
 exports.chatRouter.post("/", (req, res) => {
-    (async () => {
-        try {
-            await (0, rate_limit_js_1.checkRateLimit)(req.ip);
-            const body = zod_1.z.object({
-                message: zod_1.z.string().max(2000).default(""),
-                imageBase64: zod_1.z.string().nullable().optional(),
-                imageMimeType: zod_1.z.string().nullable().optional(),
-                productId: zod_1.z.string().nullable().optional(),
-                productType: zod_1.z.string().default("general"),
-                conversationMode: zod_1.z.string().default(""),
-                history: zod_1.z.array(zod_1.z.any()).default([]),
-                renderedProductIds: zod_1.z.array(zod_1.z.string()).default([]),
-                orderConfirmed: zod_1.z.boolean().default(false),
-                stream: zod_1.z.boolean().optional(),
-            }).refine((value) => value.message.trim().length > 0 || Boolean(value.imageBase64), {
-                message: "message ou image requis",
-                path: ["message"],
-            }).parse(req.body);
-            let message = body.message;
-            if (body.orderConfirmed) {
-                message = `[INSTRUCTION]Le prospect a deja confirme sa commande via la modale. NE PAS demander de confirmation ni re-presenter l'outil. Suivre le Closing normal etape par etape (nom → gouvernorat → adresse → telephone → disponibilite). Une fois la commande creee avec <ORDER>, AVANT d'envoyer le message de confirmation finale, proposer OBLIGATOIREMENT l'upsell livraison offerte des 2 outils. Ne pas sauter l'upsell.[/INSTRUCTION] ${message}`;
-            }
-            const extraFields = {
-                imageBase64: body.imageBase64 || null,
-                imageMimeType: body.imageMimeType || null,
-                audioBase64: null,
-                audioMimeType: null,
-            };
-            const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
-            if (wantsStream) {
-                await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
-                return;
-            }
-            const result = await generateChatResult(message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
-            await recordConversationStats(req, body.conversationMode, result);
-            res.json(result);
+    setTimeout(() => {
+        if (!res.writableEnded) {
+            res.json({ ok: true, delayed: true, msg: req.body?.message || "" });
         }
-        catch (err) {
-            if (err instanceof zod_1.z.ZodError) {
-                return res.status(400).json({
-                    error: err.errors.map((issue) => issue.message).join(", "),
-                });
-            }
-            const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
-            logger_js_1.logger.error("Chat error", { error: errMsg });
-            if (!res.headersSent) {
-                res.status(500).json({ error: "Erreur interne du serveur" });
-            }
-        }
-    })();
+    }, 100);
 });
 // POST /api/chat/voice — audio message
 exports.chatRouter.post("/voice", upload.single("audio"), async (req, res) => {
