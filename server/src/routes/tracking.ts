@@ -5,13 +5,21 @@ import { getAppConfig } from "../lib/app-config.js";
 export const trackingRouter = Router();
 
 trackingRouter.get("/tracking", async (_req: Request, res: Response) => {
-  const config = await getAppConfig();
-  res.json({
-    facebookPixelIds: config.facebookPixelIds,
-    googleAnalyticsIds: config.googleAnalyticsIds,
-    welcomeMessage: config.welcomeMessage ||
-      "Bienvenue ! Je suis l'assistant Orgonite Tunisie. Comment puis-je vous aider ?",
-  });
+  try {
+    const config = await getAppConfig();
+    res.json({
+      facebookPixelIds: config.facebookPixelIds,
+      googleAnalyticsIds: config.googleAnalyticsIds,
+      welcomeMessage: config.welcomeMessage ||
+        "Bienvenue ! Je suis l'assistant Orgonite Tunisie. Comment puis-je vous aider ?",
+    });
+  } catch {
+    res.json({
+      facebookPixelIds: [],
+      googleAnalyticsIds: [],
+      welcomeMessage: "Bienvenue ! Je suis l'assistant Orgonite Tunisie. Comment puis-je vous aider ?",
+    });
+  }
 });
 
 trackingRouter.get("/track-visit", async (req: Request, res: Response) => {

@@ -170,7 +170,10 @@ export async function sendVoiceMessage(params: {
     }
 
     const reader = res.body?.getReader();
-    if (!reader) return;
+    if (!reader) {
+      params.onError("Erreur lecture flux vocal");
+      return;
+    }
 
     const decoder = new TextDecoder();
     let buffer = "";

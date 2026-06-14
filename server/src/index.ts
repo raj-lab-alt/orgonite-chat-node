@@ -52,10 +52,7 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 const clientDist = resolve(__dirname, "../../client/dist");
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
-  app.get("/admin", (_req, res) => {
-    res.sendFile(resolve(clientDist, "admin.html"));
-  });
-  app.get("/admin/", (_req, res) => {
+  app.get(["/admin", "/admin/"], (_req, res) => {
     res.sendFile(resolve(clientDist, "admin.html"));
   });
   app.get("/sitemap.xml", (_req, res) => {

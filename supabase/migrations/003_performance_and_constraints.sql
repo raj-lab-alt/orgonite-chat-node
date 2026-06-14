@@ -24,3 +24,30 @@ ALTER TABLE orders ALTER COLUMN adresse SET DEFAULT '';
 
 -- Remove duplicate function definition from 002_app_config.sql (keep existing)
 -- (no-op: CREATE OR REPLACE already makes it safe, but this documents the intent)
+
+-- Atomic rate limiter RPC (avoids SELECT-then-UPDATE/INSERT race)
+CREATE OR REPLACE FUNCTION check_rate_limit(p_ip VARCHAR(45), p_max INT, p_window_seconds INT)
+RETURNS JSONB LANGUAGE plpgsql AS $$
+DECLARE
+  v_count INT;
+  v_reset_at TIMESTAMPTZ;
+BEGIN
+  -- Clean expired entries for this IP
+  DELETE FROM rate_limits WHERE reset_at <= now() AND ip = p_ip;
+
+  SELECT count, reset_at INTO v_count, v_reset_at
+  FROM rate_limits WHERE ip = p_ip FOR UPDATE;
+
+  IF v_count IS NOT NULL THEN
+    IF v_count >= p_max THEN
+      RETURN jsonb_build_object('allowed', false, 'retry_after', extract(epoch from (v_reset_at - now())));
+    END IF;
+    UPDATE rate_limits SET count = count + 1, reset_at = v_reset_at WHERE ip = p_ip;
+    RETURN jsonb_build_object('allowed', true);
+  ELSE
+    INSERT INTO rate_limits (ip, count, reset_at)
+    VALUES (p_ip, 1, now() + make_interval(secs => p_window_seconds));
+    RETURN jsonb_build_object('allowed', true);
+  END IF;
+END;
+$$;
