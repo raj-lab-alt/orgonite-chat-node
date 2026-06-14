@@ -35,7 +35,6 @@ export default function ChatPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const view = searchParams.get("view") || "chat";
-  const slug = searchParams.get("slug") || "";
 
   const [showAudio, setShowAudio] = useState(false);
   const [welcomeMsg, setWelcomeMsg] = useState("");

@@ -13,10 +13,20 @@ function HomePage() {
   const navigate = useNavigate();
   const setProduct = useChatStore((s) => s.setProduct);
   const setMode = useChatStore((s) => s.setMode);
-  const slug = searchParams.get("slug") || searchParams.get("product");
+  const slug = searchParams.get("slug");
+  const product = searchParams.get("product");
+  const view = searchParams.get("view") || "chat";
 
   useEffect(() => {
-    if (slug) {
+    if (product) {
+      navigate(`/?slug=${encodeURIComponent(product)}&view=product`, { replace: true });
+      return;
+    }
+    if (slug && view !== "product") {
+      navigate(`/?slug=${encodeURIComponent(slug)}&view=product`, { replace: true });
+      return;
+    }
+    if (slug && view === "product") {
       fetchProducts().then((products: ProductData[]) => {
         const p = products.find((prod) => prod.slug === slug);
         if (p) {
@@ -27,11 +37,11 @@ function HomePage() {
           navigate("/", { replace: true });
         }
       });
-    } else {
-      setProduct(null, "general");
-      setMode("A");
+      return;
     }
-  }, [slug]);
+    setProduct(null, "general");
+    setMode("A");
+  }, [slug, product, view]);
 
   return <ChatPage />;
 }
