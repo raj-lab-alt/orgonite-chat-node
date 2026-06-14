@@ -1416,6 +1416,8 @@ function injectCodProductStyles() {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column;
       justify-content: center;
+      overflow: hidden;
+      word-break: break-word;
     }
     .chat-product-title {
       font-size: 14px;
