@@ -40,6 +40,7 @@ export default function AdminPage() {
 
   const isActive = (path: string) => {
     if (path === "/admin") return location.pathname === "/admin";
+    if (path === "/") return location.pathname === "/";
     return location.pathname.startsWith(path);
   };
 

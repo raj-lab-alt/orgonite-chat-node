@@ -68,31 +68,20 @@ ordersRouter.put("/bulk-trash", requireAdmin, async (req: Request, res: Response
     const { ids } = req.body;
     if (!ids?.length) return res.status(400).json({ error: "IDs requis" });
 
-    const { data: orders, error: selectError } = await supabase
+    const now = new Date().toISOString();
+    const { error } = await supabase
       .from("orders")
-      .select("id, statut")
+      .update({
+        statut: "corbeille",
+        statut_avant_corbeille: "attente de confirm tel",
+        trashed_at: now,
+        updated_at: now,
+      })
       .in("id", ids);
 
-    if (selectError) return res.status(500).json({ error: selectError.message });
-
-    const now = new Date().toISOString();
-    const updates = (orders || []).map((order) =>
-      supabase
-        .from("orders")
-        .update({
-          statut: "corbeille",
-          statut_avant_corbeille: order.statut || "attente de confirm tel",
-          trashed_at: now,
-          updated_at: now,
-        })
-        .eq("id", order.id)
-    );
-
-    const results = await Promise.all(updates);
-    const error = results.find((result) => result.error)?.error;
     if (error) return res.status(500).json({ error: error.message });
 
-    res.json({ success: true, count: orders?.length || 0 });
+    res.json({ success: true, count: ids.length });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -111,23 +100,31 @@ ordersRouter.put("/bulk-restore", requireAdmin, async (req: Request, res: Respon
     if (selectError) return res.status(500).json({ error: selectError.message });
 
     const now = new Date().toISOString();
-    const updates = (orders || []).map((order) =>
-      supabase
-        .from("orders")
-        .update({
-          statut: order.statut_avant_corbeille || "attente de confirm tel",
-          statut_avant_corbeille: null,
-          trashed_at: null,
-          updated_at: now,
-        })
-        .eq("id", order.id)
+    const grouped: Record<string, string[]> = {};
+    for (const order of orders || []) {
+      const s = order.statut_avant_corbeille || "attente de confirm tel";
+      if (!grouped[s]) grouped[s] = [];
+      grouped[s].push(order.id);
+    }
+
+    const results = await Promise.all(
+      Object.entries(grouped).map(([statut, orderIds]) =>
+        supabase
+          .from("orders")
+          .update({
+            statut,
+            statut_avant_corbeille: null,
+            trashed_at: null,
+            updated_at: now,
+          })
+          .in("id", orderIds)
+      )
     );
 
-    const results = await Promise.all(updates);
-    const error = results.find((result) => result.error)?.error;
+    const error = results.find((r) => r.error)?.error;
     if (error) return res.status(500).json({ error: error.message });
 
-    res.json({ success: true, count: orders?.length || 0 });
+    res.json({ success: true, count: ids.length });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

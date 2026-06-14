@@ -71,13 +71,17 @@ export async function callGemini(
   systemPrompt: string,
   onChunk?: (chunk: string) => void
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Goog-Api-Key": apiKey,
+  };
 
   if (onChunk) {
     // Streaming mode
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents,
@@ -128,7 +132,7 @@ export async function callGemini(
     // Non-streaming
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents,

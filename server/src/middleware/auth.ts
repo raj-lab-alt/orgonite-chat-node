@@ -20,12 +20,15 @@ export async function requireAdmin(
     return next();
   }
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser(token);
+  let user: any;
+  try {
+    const result = await supabase.auth.getUser(token);
+    user = result.data?.user;
+  } catch {
+    return res.status(503).json({ error: "Service indisponible" });
+  }
 
-  if (error || !user) {
+  if (!user) {
     return res.status(401).json({ error: "Non autorise" });
   }
 

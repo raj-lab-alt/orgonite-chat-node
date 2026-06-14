@@ -3,6 +3,7 @@ import { Routes, Route, useParams, Navigate } from "react-router-dom";
 import { useChatStore } from "@/stores/chat-store";
 import { fetchProducts } from "@/lib/api";
 import ChatPage from "@/pages/Chat/ChatPage";
+import AdminPage from "@/pages/Admin/AdminPage";
 
 // Map URL slugs to product IDs and types
 const PRODUCT_ROUTES: Record<string, { id: string; type: string; mode: "B" | "C" }> = {
@@ -53,7 +54,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/produit/:slug" element={<ProductPage />} />
-      <Route path="/admin/*" element={<Navigate to="/admin" />} />
+      <Route path="/admin/*" element={<AdminPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

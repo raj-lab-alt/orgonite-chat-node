@@ -41,6 +41,9 @@ export default function ChatPage() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
 
+  const streamingRef = useRef(streamingContent);
+  streamingRef.current = streamingContent;
+
   const handleSend = useCallback(
     (text: string, imageBase64?: string, imageMimeType?: string) => {
       setError("");
@@ -73,6 +76,11 @@ export default function ChatPage() {
         addMessage(assistantMsg);
       }
 
+      // Abort previous in-flight request
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+
       setStreaming(true);
       clearStream();
       const controller = new AbortController();
@@ -95,7 +103,7 @@ export default function ChatPage() {
           const assistantMsg: ChatMessage = {
             id: nextId(),
             role: "assistant",
-            content: data.reply || streamingContent,
+            content: data.reply || streamingRef.current,
             timestamp: Date.now(),
             product: data.product,
             products: data.products,
@@ -104,7 +112,9 @@ export default function ChatPage() {
           addMessage(assistantMsg);
           clearStream();
           setStreaming(false);
-          setOrderConfirmed(true);
+          if (data.order) {
+            setOrderConfirmed(true);
+          }
         },
         onError: (err) => {
           setError(err);
@@ -136,6 +146,10 @@ export default function ChatPage() {
       };
       addMessage(userMsg);
 
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+
       setStreaming(true);
       clearStream();
 
@@ -151,7 +165,7 @@ export default function ChatPage() {
           const assistantMsg: ChatMessage = {
             id: nextId(),
             role: "assistant",
-            content: data.reply || streamingContent,
+            content: data.reply || streamingRef.current,
             timestamp: Date.now(),
             product: data.product,
             products: data.products,
