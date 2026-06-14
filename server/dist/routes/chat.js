@@ -395,7 +395,7 @@ exports.chatRouter.get("/diag", async (_req, res) => {
     }
 });
 // POST /api/chat — text + optional image
-// TEST: generateChatResult
+// TEST: full flow (stats + res.json)
 exports.chatRouter.post("/", (req, res) => {
     setTimeout(async () => {
         try {
@@ -415,21 +415,16 @@ exports.chatRouter.post("/", (req, res) => {
                 path: ["message"],
             }).parse(req.body);
             const result = await generateChatResult(body.message, { imageBase64: null, imageMimeType: null, audioBase64: null, audioMimeType: null }, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
+            await recordConversationStats(req, body.conversationMode, result);
             if (!res.writableEnded) {
-                res.json({ ok: true, step: "generateChatResult", replyLength: result.reply.length });
+                res.json({ ok: true, step: "full", reply: result.reply });
             }
         }
         catch (err) {
             const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
             console.error("[handler error]", errMsg);
-            if (err instanceof zod_1.z.ZodError) {
-                if (!res.writableEnded)
-                    res.json({ ok: false, step: "zod", errors: err.errors.map((e) => e.message) });
-            }
-            else {
-                if (!res.writableEnded)
-                    res.json({ ok: false, step: "unknown", error: errMsg });
-            }
+            if (!res.writableEnded)
+                res.json({ ok: false, step: "full", error: errMsg });
         }
     }, 0);
 });

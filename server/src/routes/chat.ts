@@ -426,7 +426,7 @@ chatRouter.get("/diag", async (_req: Request, res: Response) => {
 });
 
 // POST /api/chat — text + optional image
-// TEST: generateChatResult
+// TEST: full flow (stats + res.json)
 chatRouter.post("/", (req: Request, res: Response) => {
   setTimeout(async () => {
     try {
@@ -451,17 +451,14 @@ chatRouter.post("/", (req: Request, res: Response) => {
         body.history, body.productId || null, body.conversationMode, false,
         body.productType, body.orderConfirmed, body.renderedProductIds
       );
+      await recordConversationStats(req, body.conversationMode, result);
       if (!res.writableEnded) {
-        res.json({ ok: true, step: "generateChatResult", replyLength: result.reply.length });
+        res.json({ ok: true, step: "full", reply: result.reply });
       }
     } catch (err: any) {
       const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
       console.error("[handler error]", errMsg);
-      if (err instanceof z.ZodError) {
-        if (!res.writableEnded) res.json({ ok: false, step: "zod", errors: err.errors.map((e: any) => e.message) });
-      } else {
-        if (!res.writableEnded) res.json({ ok: false, step: "unknown", error: errMsg });
-      }
+      if (!res.writableEnded) res.json({ ok: false, step: "full", error: errMsg });
     }
   }, 0);
 });
