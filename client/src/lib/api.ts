@@ -77,9 +77,8 @@ export async function sendMessage({
     orderConfirmed,
   };
 
-  // Try SSE first; fall back to JSON if timeout
-  await trySSE(body, onChunk, onDone, onError, signal) ||
-    tryJSON(body, onDone, onError, signal);
+  // SSE désactivé temporairement
+  await tryJSON(body, onDone, onError, signal);
 }
 
 async function trySSE(
