@@ -113,11 +113,13 @@ async function trySSE(
     const decoder = new TextDecoder();
     let buffer = "";
     let gotData = false;
+    let timedOut = false;
     let sseTimeout: ReturnType<typeof setTimeout> | undefined;
 
     const clearSseTimeout = () => { if (sseTimeout !== undefined) { clearTimeout(sseTimeout); sseTimeout = undefined; } };
     const fail = () => {
       clearSseTimeout();
+      timedOut = true;
       reader.cancel();
     };
 
@@ -158,6 +160,7 @@ async function trySSE(
       }
     }
     clearSseTimeout();
+    if (timedOut) return false;
     return true;
   } catch (err: any) {
     if (err.name === "AbortError") return false;
