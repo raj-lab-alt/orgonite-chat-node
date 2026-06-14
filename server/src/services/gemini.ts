@@ -150,7 +150,6 @@ export class GeminiError extends Error {
 let globalKeyIndex = 0;
 let globalModelIndex = 0;
 let topModelIndex = 0;
-let topKeyIndex = 0;
 
 const MIN_SOLID_SAMPLES = 10;
 
@@ -169,19 +168,6 @@ function getTopModels(models: string[]): string[] | null {
   return scored.length >= 1 ? scored : null;
 }
 
-function getTopKeys(apiKeysLength: number): number[] | null {
-  const stats = getModelStats();
-  const scored = stats.keys
-    .filter(k => k.requests >= MIN_SOLID_SAMPLES)
-    .sort((a, b) => {
-      if (b.successRate !== a.successRate) return b.successRate - a.successRate;
-      return a.avgLatencyMs - b.avgLatencyMs;
-    })
-    .slice(0, Math.min(apiKeysLength, 5))
-    .map(k => k.keyIndex);
-  return scored.length >= 1 ? scored : null;
-}
-
 function pickModel(models: string[]): string {
   const topModels = getTopModels(models);
   if (topModels) {
@@ -192,11 +178,6 @@ function pickModel(models: string[]): string {
 }
 
 function pickKeyIndex(apiKeysLength: number): number {
-  const topKeys = getTopKeys(apiKeysLength);
-  if (topKeys) {
-    const idx = topKeyIndex++ % topKeys.length;
-    return topKeys[idx];
-  }
   return globalKeyIndex++ % apiKeysLength;
 }
 
