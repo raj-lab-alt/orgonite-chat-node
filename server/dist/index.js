@@ -19,6 +19,7 @@ const auth_js_1 = require("./middleware/auth.js");
 dotenv_1.default.config({ path: (0, path_1.resolve)(__dirname, "../../.env") });
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
+app.set("trust proxy", 1);
 app.use((0, helmet_1.default)({ contentSecurityPolicy: false }));
 app.use((0, cors_1.default)({ origin: process.env.CLIENT_ORIGIN || "*" }));
 app.use(express_1.default.json({ limit: "20mb" }));

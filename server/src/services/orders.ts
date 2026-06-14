@@ -124,7 +124,7 @@ export function normalizeOrderText(str: string): string {
     .trim();
 }
 
-function orderToRow(data: OrderData): Record<string, unknown> {
+function orderToRow(data: OrderData, fillRequiredDefaults = false): Record<string, unknown> {
   const row: Record<string, unknown> = {};
   const fields: Array<[keyof OrderData | string, string]> = [
     ["id", "id"],
@@ -155,6 +155,31 @@ function orderToRow(data: OrderData): Record<string, unknown> {
   for (const [source, target] of fields) {
     const value = data[source];
     if (value !== undefined) row[target] = value;
+  }
+
+  if (fillRequiredDefaults) {
+    for (const requiredTextField of [
+      "nom",
+      "telephone",
+      "telephone2",
+      "gouvernorat",
+      "adresse",
+      "produit",
+      "format_personnalise",
+      "date_naissance",
+      "signe_astrologique",
+      "chemin_vie",
+      "nombre_ame",
+      "nombre_personnalite",
+      "composition_personnalisee",
+      "brief_fabrication",
+      "notes",
+      "statut",
+    ]) {
+      if (row[requiredTextField] === undefined || row[requiredTextField] === null) {
+        row[requiredTextField] = "";
+      }
+    }
   }
 
   if (typeof row.telephone === "string") {
@@ -236,7 +261,7 @@ export async function saveOrderWithoutDuplicate(
   delete data.remplace_commande;
   delete data.fusion_avec;
 
-  const { error } = await supabase.from("orders").insert(orderToRow(data) as any);
+  const { error } = await supabase.from("orders").insert(orderToRow(data, true) as any);
   if (error) throw error;
 
   return { order: data, created: true };

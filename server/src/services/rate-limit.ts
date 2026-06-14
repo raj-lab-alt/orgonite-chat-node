@@ -4,12 +4,12 @@ const WINDOW_SECONDS = 60;
 const MAX_REQUESTS = 10;
 
 export async function checkRateLimit(
+  identifier = "unknown",
   maxRequests = MAX_REQUESTS,
   windowSeconds = WINDOW_SECONDS
 ): Promise<void> {
   try {
-    const ip =
-      (globalThis as any).__requestIp || "unknown";
+    const ip = String(identifier || "unknown").slice(0, 45);
 
     const now = new Date().toISOString();
     const resetAt = new Date(

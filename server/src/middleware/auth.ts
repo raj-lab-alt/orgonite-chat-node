@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { supabase } from "../lib/supabase.js";
-import { isAdminToken } from "../lib/admin-auth.js";
+import { isAdminToken, isSupabaseAdminUser } from "../lib/admin-auth.js";
 
 export async function requireAdmin(
   req: Request,
@@ -27,6 +27,10 @@ export async function requireAdmin(
 
   if (error || !user) {
     return res.status(401).json({ error: "Non autorise" });
+  }
+
+  if (!isSupabaseAdminUser(user)) {
+    return res.status(403).json({ error: "Acces admin refuse" });
   }
 
   (req as any).user = user;

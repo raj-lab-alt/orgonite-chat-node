@@ -50,7 +50,10 @@ export async function sendMessage({
   try {
     const res = await fetch(`${BASE}/api/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+      },
       body: JSON.stringify({
         message,
         imageBase64,
@@ -60,6 +63,7 @@ export async function sendMessage({
         conversationMode,
         history,
         orderConfirmed,
+        stream: true,
       }),
       signal,
     });
@@ -136,8 +140,9 @@ export async function sendVoiceMessage(params: {
     if (params.conversationMode) formData.append("conversationMode", params.conversationMode);
     if (params.history) formData.append("history", params.history);
 
-    const res = await fetch(`${BASE}/api/chat/voice`, {
+    const res = await fetch(`${BASE}/api/chat/voice?stream=1`, {
       method: "POST",
+      headers: { Accept: "text/event-stream" },
       body: formData,
     });
 

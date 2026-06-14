@@ -94,6 +94,20 @@ function productNameInMessage(message: string, products: any[]): Set<string> {
   return mentioned;
 }
 
+function missingOrderFields(orderData: any) {
+  const required: Array<[string, string]> = [
+    ["nom", "nom"],
+    ["telephone", "telephone"],
+    ["gouvernorat", "gouvernorat"],
+    ["adresse", "adresse"],
+    ["produit", "produit"],
+  ];
+
+  return required
+    .filter(([key]) => !String(orderData?.[key] || "").trim())
+    .map(([, label]) => label);
+}
+
 async function generateChatResult(
   message: string,
   extraFields: any,
@@ -128,6 +142,7 @@ async function generateChatResult(
   const visibleReply = sanitizeAssistantReply(fullReply);
   const { cleanReply, orderData } = detectOrderFromReply(visibleReply);
   let savedOrder = null;
+  let orderValidationReply = "";
 
   if (orderData) {
     const normalized = normalizeOrderPayload(orderData);
@@ -135,14 +150,21 @@ async function generateChatResult(
     normalized.date = new Date().toISOString();
     normalized.statut = statuses[0];
 
-    if (normalized.produit?.trim()) {
+    const missing = missingOrderFields(normalized);
+    if (missing.length > 0) {
+      console.warn(`[orders] Incomplete order ignored. Missing: ${missing.join(", ")}`);
+      orderValidationReply =
+        "Il me manque encore quelques informations pour enregistrer la commande : " +
+        missing.join(", ") +
+        ". Peux-tu me les envoyer ?";
+    } else {
       applyOrderAmounts(normalized, products.map((p: any) => ({ name: p.name, price: p.price, id: p.id })));
       const saved = await saveOrderWithoutDuplicate(normalized, statuses, products.map((p: any) => ({ name: p.name, price: p.price, id: p.id })));
       savedOrder = orderResponse(saved.order, saved.created);
     }
   }
 
-  const reply = stripPrematureUpsell(cleanReply || visibleReply, message, orderConfirmed, Boolean(savedOrder));
+  const reply = stripPrematureUpsell(orderValidationReply || cleanReply || visibleReply, message, orderConfirmed, Boolean(savedOrder));
   const { productData, productList } = detectProductsFromReply(reply, products, {
     productId,
     productType,
@@ -207,7 +229,7 @@ async function handleChatSSE(
 // POST /api/chat — text + optional image
 chatRouter.post("/", async (req: Request, res: Response) => {
   try {
-    await checkRateLimit();
+    await checkRateLimit(req.ip);
     const body = z.object({
       message: z.string().max(2000).default(""),
       imageBase64: z.string().nullable().optional(),
@@ -260,7 +282,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 // POST /api/chat/voice — audio message
 chatRouter.post("/voice", upload.single("audio"), async (req: Request, res: Response) => {
   try {
-    await checkRateLimit();
+    await checkRateLimit(req.ip);
 
     if (!req.file) {
       return res.status(400).json({ error: "Fichier audio manquant" });

@@ -96,7 +96,7 @@ function normalizeOrderText(str) {
         .toLowerCase()
         .trim();
 }
-function orderToRow(data) {
+function orderToRow(data, fillRequiredDefaults = false) {
     const row = {};
     const fields = [
         ["id", "id"],
@@ -127,6 +127,30 @@ function orderToRow(data) {
         const value = data[source];
         if (value !== undefined)
             row[target] = value;
+    }
+    if (fillRequiredDefaults) {
+        for (const requiredTextField of [
+            "nom",
+            "telephone",
+            "telephone2",
+            "gouvernorat",
+            "adresse",
+            "produit",
+            "format_personnalise",
+            "date_naissance",
+            "signe_astrologique",
+            "chemin_vie",
+            "nombre_ame",
+            "nombre_personnalite",
+            "composition_personnalisee",
+            "brief_fabrication",
+            "notes",
+            "statut",
+        ]) {
+            if (row[requiredTextField] === undefined || row[requiredTextField] === null) {
+                row[requiredTextField] = "";
+            }
+        }
     }
     if (typeof row.telephone === "string") {
         row.telephone = normalizePhone(row.telephone);
@@ -187,7 +211,7 @@ async function saveOrderWithoutDuplicate(data, statuses, products) {
     data.statut = data.statut || statuses[0];
     delete data.remplace_commande;
     delete data.fusion_avec;
-    const { error } = await supabase_js_1.supabase.from("orders").insert(orderToRow(data));
+    const { error } = await supabase_js_1.supabase.from("orders").insert(orderToRow(data, true));
     if (error)
         throw error;
     return { order: data, created: true };

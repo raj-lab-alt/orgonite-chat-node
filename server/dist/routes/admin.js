@@ -73,7 +73,11 @@ exports.adminRouter.post("/login", async (req, res) => {
             return res.status(400).json({ error: "Mot de passe requis" });
         }
         if (!email) {
-            if (password !== (0, admin_auth_js_1.adminPassword)()) {
+            const configuredPassword = (0, admin_auth_js_1.adminPassword)();
+            if (!configuredPassword) {
+                return res.status(500).json({ error: "ADMIN_PASSWORD non configure" });
+            }
+            if (password !== configuredPassword) {
                 return res.status(401).json({ error: "Identifiants invalides" });
             }
             return res.json({ token: (0, admin_auth_js_1.adminToken)(), user: { role: "admin" } });
@@ -84,6 +88,9 @@ exports.adminRouter.post("/login", async (req, res) => {
         });
         if (error)
             return res.status(401).json({ error: "Identifiants invalides" });
+        if (!(0, admin_auth_js_1.isSupabaseAdminUser)(data.user)) {
+            return res.status(403).json({ error: "Acces admin refuse" });
+        }
         res.json({
             token: data.session?.access_token,
             user: {

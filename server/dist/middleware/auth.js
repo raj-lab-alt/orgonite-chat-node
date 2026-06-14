@@ -17,6 +17,9 @@ async function requireAdmin(req, res, next) {
     if (error || !user) {
         return res.status(401).json({ error: "Non autorise" });
     }
+    if (!(0, admin_auth_js_1.isSupabaseAdminUser)(user)) {
+        return res.status(403).json({ error: "Acces admin refuse" });
+    }
     req.user = user;
     next();
 }

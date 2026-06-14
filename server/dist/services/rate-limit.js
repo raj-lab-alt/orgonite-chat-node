@@ -4,9 +4,9 @@ exports.checkRateLimit = checkRateLimit;
 const supabase_js_1 = require("../lib/supabase.js");
 const WINDOW_SECONDS = 60;
 const MAX_REQUESTS = 10;
-async function checkRateLimit(maxRequests = MAX_REQUESTS, windowSeconds = WINDOW_SECONDS) {
+async function checkRateLimit(identifier = "unknown", maxRequests = MAX_REQUESTS, windowSeconds = WINDOW_SECONDS) {
     try {
-        const ip = globalThis.__requestIp || "unknown";
+        const ip = String(identifier || "unknown").slice(0, 45);
         const now = new Date().toISOString();
         const resetAt = new Date(Date.now() + windowSeconds * 1000).toISOString();
         // Clean expired entries
