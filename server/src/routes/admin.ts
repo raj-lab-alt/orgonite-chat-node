@@ -6,6 +6,7 @@ import { adminPassword, adminToken, isSupabaseAdminUser, verifyAdminPassword } f
 import { getAppConfig, maskApiKeys, updateAppConfig } from "../lib/app-config.js";
 import { logger } from "../lib/logger.js";
 import { getModelStats, clearStats } from "../services/gemini-stats.js";
+import { refreshModelList } from "../services/gemini-models.js";
 
 const configSchema = z.object({
   systemPrompt: z.string().min(1).max(50000).optional(),
@@ -123,6 +124,19 @@ adminRouter.put("/config", requireAdmin, async (req: Request, res: Response) => 
     if (err instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation echouee", details: err.errors });
     }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+adminRouter.post("/refresh-gemini-models", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const config = await getAppConfig();
+    if (!config.geminiApiKeys.length) {
+      return res.status(400).json({ error: "Aucune cle API Gemini configuree" });
+    }
+    const models = await refreshModelList(config.geminiApiKeys[0]);
+    res.json({ success: true, models });
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });

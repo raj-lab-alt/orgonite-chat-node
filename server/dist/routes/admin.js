@@ -42,6 +42,7 @@ const admin_auth_js_1 = require("../lib/admin-auth.js");
 const app_config_js_1 = require("../lib/app-config.js");
 const logger_js_1 = require("../lib/logger.js");
 const gemini_stats_js_1 = require("../services/gemini-stats.js");
+const gemini_models_js_1 = require("../services/gemini-models.js");
 const configSchema = zod_1.z.object({
     systemPrompt: zod_1.z.string().min(1).max(50000).optional(),
     catalogItemTemplate: zod_1.z.string().min(1).max(10000).optional(),
@@ -154,6 +155,19 @@ exports.adminRouter.put("/config", auth_js_1.requireAdmin, async (req, res) => {
         if (err instanceof zod_1.z.ZodError) {
             return res.status(400).json({ error: "Validation echouee", details: err.errors });
         }
+        res.status(500).json({ error: err.message });
+    }
+});
+exports.adminRouter.post("/refresh-gemini-models", auth_js_1.requireAdmin, async (_req, res) => {
+    try {
+        const config = await (0, app_config_js_1.getAppConfig)();
+        if (!config.geminiApiKeys.length) {
+            return res.status(400).json({ error: "Aucune cle API Gemini configuree" });
+        }
+        const models = await (0, gemini_models_js_1.refreshModelList)(config.geminiApiKeys[0]);
+        res.json({ success: true, models });
+    }
+    catch (err) {
         res.status(500).json({ error: err.message });
     }
 });

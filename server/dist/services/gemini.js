@@ -4,7 +4,9 @@ exports.GeminiError = void 0;
 exports.buildContents = buildContents;
 exports.callGemini = callGemini;
 exports.chatGeminiRequestStream = chatGeminiRequestStream;
+const logger_js_1 = require("../lib/logger.js");
 const gemini_stats_js_1 = require("./gemini-stats.js");
+const gemini_models_js_1 = require("./gemini-models.js");
 function buildContents(messages) {
     const contents = [];
     for (const msg of messages) {
@@ -143,8 +145,10 @@ async function takeFirstChunk(stream) {
 async function* chatGeminiRequestStream(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, models) {
     if (!apiKeys.length)
         throw new Error("Aucune cle API Gemini configuree.");
-    if (!models.length)
-        throw new Error("Aucun modele Gemini configure.");
+    // Auto-refresh if models list is empty (first use)
+    if (models.length === 0) {
+        models = await (0, gemini_models_js_1.refreshModelList)(apiKeys[0]);
+    }
     const mode = (conversationMode || (productId === "orgonite_perso" ? "C" : productId ? "B" : "A")).toUpperCase();
     const trimmedHistory = history.slice(0, 100);
     const messages = [...trimmedHistory];
@@ -194,7 +198,7 @@ async function* chatGeminiRequestStream(message, extraFields, history, productId
     try {
         winner = await firstSuccess(firstChunkPromises);
     }
-    catch {
+    catch (firstErr) {
         controllers.forEach(c => { try {
             c.abort();
         }
@@ -208,7 +212,19 @@ async function* chatGeminiRequestStream(message, extraFields, history, productId
                 latencyMs: startTimes[i] ? Date.now() - startTimes[i] : 0,
             });
         }
-        throw new Error("Tous les modeles ont echoue");
+        // All models failed — try refreshing the model list and retry once
+        try {
+            const newModels = await (0, gemini_models_js_1.refreshModelList)(apiKeys[0]);
+            const changed = newModels.length !== models.length ||
+                newModels.some((m, i) => m !== models[i]);
+            if (!changed)
+                throw firstErr;
+            logger_js_1.logger.info(`Retrying with refreshed models: ${newModels.join(", ")}`);
+            return yield* chatGeminiRequestStream(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, newModels);
+        }
+        catch {
+            throw firstErr;
+        }
     }
     // Abort all loser models
     controllers.forEach((c, i) => { if (i !== winner.index) {

@@ -1,5 +1,7 @@
+import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
 import { recordAttempt } from "./gemini-stats.js";
+import { refreshModelList } from "./gemini-models.js";
 
 interface GeminiContent {
   role: "user" | "model";
@@ -190,7 +192,11 @@ export async function* chatGeminiRequestStream(
   models: string[]
 ): AsyncGenerator<string> {
   if (!apiKeys.length) throw new Error("Aucune cle API Gemini configuree.");
-  if (!models.length) throw new Error("Aucun modele Gemini configure.");
+
+  // Auto-refresh if models list is empty (first use)
+  if (models.length === 0) {
+    models = await refreshModelList(apiKeys[0]);
+  }
 
   const mode = (conversationMode || (productId === "orgonite_perso" ? "C" : productId ? "B" : "A")).toUpperCase();
   const trimmedHistory = history.slice(0, 100);
@@ -250,7 +256,7 @@ export async function* chatGeminiRequestStream(
 
   try {
     winner = await firstSuccess(firstChunkPromises);
-  } catch {
+  } catch (firstErr: any) {
     controllers.forEach(c => { try { c.abort(); } catch {} });
     for (let i = 0; i < models.length; i++) {
       recordAttempt({
@@ -261,7 +267,22 @@ export async function* chatGeminiRequestStream(
         latencyMs: startTimes[i] ? Date.now() - startTimes[i] : 0,
       });
     }
-    throw new Error("Tous les modeles ont echoue");
+
+    // All models failed — try refreshing the model list and retry once
+    try {
+      const newModels = await refreshModelList(apiKeys[0]);
+      const changed = newModels.length !== models.length ||
+        newModels.some((m, i) => m !== models[i]);
+      if (!changed) throw firstErr;
+
+      logger.info(`Retrying with refreshed models: ${newModels.join(", ")}`);
+      return yield* chatGeminiRequestStream(
+        message, extraFields, history, productId, conversationMode,
+        isVoice, productType, systemPrompt, apiKeys, newModels
+      );
+    } catch {
+      throw firstErr;
+    }
   }
 
   // Abort all loser models

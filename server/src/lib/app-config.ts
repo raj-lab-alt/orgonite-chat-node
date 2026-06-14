@@ -74,7 +74,7 @@ function fallbackConfig(): AppConfig {
     googleAnalyticsIds: asStringList(legacy.googleAnalyticsIds, splitEnvList(process.env.GA4_ID)),
     statuses: legacyStatuses.length ? legacyStatuses : DEFAULT_STATUSES,
     geminiApiKeys: splitEnvList(process.env.GEMINI_API_KEYS),
-    geminiModels: validGeminiModels(splitEnvList(process.env.GEMINI_MODELS)),
+    geminiModels: [],
     source: "seed",
   };
 }

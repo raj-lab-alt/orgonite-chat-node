@@ -134,6 +134,13 @@ export function deleteService(id: string) {
   });
 }
 
+// --- Gemini Models ---
+export function refreshGeminiModels() {
+  return apiFetch<{ success: boolean; models: string[] }>("/api/admin/refresh-gemini-models", {
+    method: "POST",
+  });
+}
+
 // --- Gemini Stats ---
 export function getGeminiStats() {
   return apiFetch<{ models: any[]; keys: any[]; totalRequests: number }>("/api/admin/gemini-stats");

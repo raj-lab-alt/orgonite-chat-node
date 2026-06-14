@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { getConfig, updateConfig } from "@/lib/admin-api";
+import { getConfig, updateConfig, refreshGeminiModels } from "@/lib/admin-api";
 
 export default function ConfigPage() {
   const [config, setConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [refreshingModels, setRefreshingModels] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState("");
   const [welcomeMessage, setWelcomeMessage] = useState("");
 
@@ -19,6 +20,20 @@ export default function ConfigPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const handleRefreshModels = async () => {
+    setRefreshingModels(true);
+    setMessage("");
+    try {
+      const result = await refreshGeminiModels();
+      const updated = await getConfig();
+      setConfig(updated);
+      setMessage(`Modeles mis a jour: ${result.models.join(", ")}`);
+    } catch (err: any) {
+      setMessage(err.message);
+    }
+    setRefreshingModels(false);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -94,8 +109,17 @@ export default function ConfigPage() {
             <p className="font-medium">{config?._apiKeyCount || 0} configuree(s)</p>
           </div>
           <div>
-            <p className="text-muted-foreground text-xs">Modeles</p>
-            <p className="font-medium">{(config?.models || []).join(", ") || "Aucun"}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-muted-foreground text-xs">Modeles</p>
+              <button
+                onClick={handleRefreshModels}
+                disabled={refreshingModels}
+                className="text-xs text-primary hover:underline disabled:opacity-50"
+              >
+                {refreshingModels ? "..." : "Rafraichir"}
+              </button>
+            </div>
+            <p className="font-medium text-xs leading-relaxed mt-1">{(config?.models || []).join(", ") || "Aucun"}</p>
           </div>
           <div>
             <p className="text-muted-foreground text-xs">Facebook Pixel</p>
