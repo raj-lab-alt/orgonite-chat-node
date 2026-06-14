@@ -229,10 +229,10 @@ export default function ChatPage() {
           />
         ))}
 
-        {isStreaming && (
+        {isStreaming && streamingContent && (
           <ChatMessageBubble
             role="assistant"
-            content={streamingContent || ""}
+            content={streamingContent}
             isStreaming
             onOrderProduct={handleOrderProduct}
           />

@@ -75,9 +75,6 @@ export function ChatMessageBubble({
       >
         <p className="whitespace-pre-wrap break-words">
           {displayContent}
-          {isStreaming && (
-            <span className="inline-block w-1.5 h-4 ml-0.5 bg-current" />
-          )}
         </p>
 
         {imageBase64 && imageMimeType && (
