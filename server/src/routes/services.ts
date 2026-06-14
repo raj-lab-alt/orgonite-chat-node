@@ -1,6 +1,23 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { memoize, cacheDel } from "../lib/cache.js";
+import { logger } from "../lib/logger.js";
+
+const SERVICE_TTL = 30_000;
+
+async function fetchServices(isAdmin: boolean) {
+  let query = supabase.from("services").select("*, service_products(product_id)");
+  if (!isAdmin) query = query.eq("visible", true);
+  const { data, error } = await query.order(isAdmin ? "created_at" : "name", { ascending: !isAdmin });
+  if (error) throw new Error(error.message);
+  return (data || []).map(formatService);
+}
+
+function invalidateServiceCache() {
+  cacheDel("services:admin");
+  cacheDel("services:public");
+}
 
 export const servicesRouter = Router();
 
@@ -8,21 +25,10 @@ export const servicesRouter = Router();
 servicesRouter.get("/", async (_req: Request, res: Response) => {
   try {
     const isAdminMount = _req.baseUrl.includes("/api/admin/");
-    let query = supabase
-      .from("services")
-      .select("*, service_products(product_id)");
-
-    if (!isAdminMount) {
-      query = query.eq("visible", true);
-    }
-
-    const { data, error } = await query.order(isAdminMount ? "created_at" : "name", {
-      ascending: !isAdminMount,
-    });
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json((data || []).map(formatService));
+    const services = await memoize(isAdminMount ? "services:admin" : "services:public", () => fetchServices(isAdminMount), SERVICE_TTL);
+    res.json(services);
   } catch (err: any) {
+    logger.error("Failed to fetch services", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -30,14 +36,10 @@ servicesRouter.get("/", async (_req: Request, res: Response) => {
 // Admin: list all services
 servicesRouter.get("/admin", requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
-      .from("services")
-      .select("*, service_products(product_id)")
-      .order("created_at", { ascending: false });
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json((data || []).map(formatService));
+    const services = await memoize("services:admin", () => fetchServices(true), SERVICE_TTL);
+    res.json(services);
   } catch (err: any) {
+    logger.error("Failed to fetch admin services", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -80,8 +82,10 @@ servicesRouter.post("/", requireAdmin, async (req: Request, res: Response) => {
       if (linkErr) return res.status(500).json({ error: linkErr.message });
     }
 
+    invalidateServiceCache();
     res.json({ success: true, id: body.id });
   } catch (err: any) {
+    logger.error("Failed to create service", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -145,8 +149,10 @@ servicesRouter.put("/:id", requireAdmin, async (req: Request, res: Response) => 
       }
     }
 
+    invalidateServiceCache();
     res.json({ success: true, id: req.params.id });
   } catch (err: any) {
+    logger.error("Failed to update service", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -160,8 +166,10 @@ servicesRouter.delete("/:id", requireAdmin, async (req: Request, res: Response) 
       .eq("id", req.params.id);
 
     if (error) return res.status(500).json({ error: error.message });
+    invalidateServiceCache();
     res.json({ success: true, deleted: true });
   } catch (err: any) {
+    logger.error("Failed to delete service", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });

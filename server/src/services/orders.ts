@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase.js";
+import { broadcastAdmin } from "../lib/admin-ws.js";
 
 export interface OrderData {
   id?: string;
@@ -276,6 +277,7 @@ export async function saveOrderWithoutDuplicate(
       throw error;
     }
 
+    broadcastAdmin("new_order", { id: data.id, nom: data.nom, produit: data.produit, total: data.totalCommande });
     return { order: data, created: true };
   }
 

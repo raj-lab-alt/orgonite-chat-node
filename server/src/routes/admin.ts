@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { adminPassword, adminToken, isSupabaseAdminUser, verifyAdminPassword } from "../lib/admin-auth.js";
 import { getAppConfig, maskApiKeys, updateAppConfig } from "../lib/app-config.js";
+import { logger } from "../lib/logger.js";
 
 const configSchema = z.object({
   systemPrompt: z.string().min(1).max(50000).optional(),
@@ -215,7 +216,7 @@ adminRouter.get("/stats", requireAdmin, async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    console.error("Stats error:", err);
+    logger.error("Stats error", { error: err.message });
     res.status(500).json({ error: "Erreur lors du chargement des statistiques" });
   }
 });

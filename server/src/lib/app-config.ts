@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { supabase } from "./supabase.js";
 import { getLegacyConfig, getLegacyStatuses } from "./legacy-config.js";
+import { memoize, cacheDel } from "./cache.js";
+import { logger } from "./logger.js";
 
 const DEFAULT_CATALOG_TEMPLATE =
   "{n}. {name} [RENDER_PRODUCT:{id}] : {benefits} Composition : {composition}{taille} Taille : {taille}.{/taille} Prix : {price} {currency}.";
@@ -105,7 +107,7 @@ export function maskApiKeys(apiKeys: string[]) {
   return apiKeys.map(() => "***");
 }
 
-export async function getAppConfig(): Promise<AppConfig> {
+async function fetchAppConfig(): Promise<AppConfig> {
   const fallback = fallbackConfig();
 
   const { data, error } = await supabase
@@ -115,7 +117,7 @@ export async function getAppConfig(): Promise<AppConfig> {
     .maybeSingle();
 
   if (error) {
-    console.error("[app-config] Falling back to seed config:", error.message);
+    logger.warn("Falling back to seed config", { error: error.message });
     return fallback;
   }
 
@@ -140,11 +142,15 @@ export async function getAppConfig(): Promise<AppConfig> {
     .single();
 
   if (insertError) {
-    console.error("[app-config] Failed to seed database config:", insertError.message);
+    logger.error("Failed to seed database config", { error: insertError.message });
     return fallback;
   }
 
   return rowToConfig(inserted, fallback);
+}
+
+export async function getAppConfig(): Promise<AppConfig> {
+  return memoize("app:config", fetchAppConfig, 30_000);
 }
 
 export async function updateAppConfig(update: AppConfigUpdate): Promise<AppConfig> {
@@ -159,5 +165,6 @@ export async function updateAppConfig(update: AppConfigUpdate): Promise<AppConfi
     .single();
 
   if (error) throw error;
+  cacheDel("app:config");
   return rowToConfig(data, existing);
 }

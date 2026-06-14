@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
 import dotenv from "dotenv";
 import { resolve } from "path";
+import { logger } from "./logger.js";
 
 dotenv.config({ path: resolve(__dirname, "../../../.env") });
 
@@ -10,7 +11,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 const hasSupabaseConfig = Boolean(supabaseUrl && supabaseServiceKey);
 
 if (!hasSupabaseConfig) {
-  console.warn(
+  logger.warn(
     "Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables"
   );
 }

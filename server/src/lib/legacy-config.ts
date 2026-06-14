@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs";
 import { resolve } from "path";
+import { logger } from "../lib/logger.js";
 
 interface LegacyConfig {
   catalogItemTemplate?: string;
@@ -26,7 +27,7 @@ export function getLegacyConfig(): LegacyConfig {
     const rawConfig = readFileSync(configPath, "utf-8").replace(/^\uFEFF/, "");
     cachedConfig = JSON.parse(rawConfig);
   } catch (err) {
-    console.error("[legacy-config] Failed to read legacy config:", err);
+    logger.error("Failed to read legacy config", { error: (err instanceof Error ? err.message : String(err)) });
     cachedConfig = {};
   }
 

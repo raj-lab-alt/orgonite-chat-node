@@ -17,6 +17,7 @@ import { checkRateLimit } from "../services/rate-limit.js";
 import { getAppConfig } from "../lib/app-config.js";
 import { formatProduct } from "../lib/product-format.js";
 import { sanitizeAssistantReply } from "../lib/reply-sanitize.js";
+import { logger } from "../lib/logger.js";
 
 export const chatRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -24,7 +25,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 async function getConfig() {
   const appConfig = await getAppConfig();
   let products: any[] = [];
-  try { const { data } = await supabase.from("products").select("*").eq("visible", true); if (data) products = data; } catch { console.warn("[chat] Failed to load products"); }
+  try { const { data } = await supabase.from("products").select("*").eq("visible", true); if (data) products = data; } catch { logger.warn("Failed to load products"); }
   return {
     apiKeys: appConfig.geminiApiKeys,
     models: appConfig.geminiModels,
@@ -146,7 +147,7 @@ async function recordConversationStats(req: Request, mode: string, result: ChatR
       stage,
     });
   } catch (err: any) {
-    console.warn("[stats] Conversation stats not recorded:", err.message || err);
+    logger.warn("Conversation stats not recorded", { error: (err?.message || String(err)) });
   }
 }
 
@@ -177,7 +178,7 @@ async function generateChatResult(
       fullReply += chunk;
     }
   } catch (err: any) {
-    console.error("Gemini chat error:", err.message);
+    logger.error("Gemini chat error", { error: err.message });
     fullReply = "Desole, une erreur est survenue. Veuillez reessayer.";
   }
 
@@ -194,7 +195,7 @@ async function generateChatResult(
 
     const missing = missingOrderFields(normalized);
     if (missing.length > 0) {
-      console.warn(`[orders] Incomplete order ignored. Missing: ${missing.join(", ")}`);
+      logger.warn(`Incomplete order ignored. Missing: ${missing.join(", ")}`);
       orderValidationReply =
         "Il me manque encore quelques informations pour enregistrer la commande : " +
         missing.join(", ") +
@@ -221,7 +222,7 @@ async function generateChatResult(
       (p: any) => !renderedProductIds.includes(p.id) || mentionedIds.has(p.id)
     );
     if (filtered.length !== productList.length) {
-      console.log(`[DEDUP] filtered ${productList.length - filtered.length} already-rendered products`);
+      logger.info(`filtered ${productList.length - filtered.length} already-rendered products`);
       productList.splice(0, productList.length, ...filtered);
     }
   }
@@ -319,7 +320,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         error: err.errors.map((issue) => issue.message).join(", "),
       });
     }
-    console.error("Chat error:", err);
+    logger.error("Chat error", { error: (err instanceof Error ? err.message : String(err)) });
     res.status(500).json({ error: "Erreur interne du serveur" });
   }
 });
@@ -342,12 +343,12 @@ chatRouter.post("/voice", upload.single("audio"), async (req: Request, res: Resp
 
     let history: any[] = [];
     if (req.body.history) {
-      try { history = JSON.parse(req.body.history as string); } catch { console.warn("[chat] Invalid history JSON"); }
+      try { history = JSON.parse(req.body.history as string); } catch { logger.warn("Invalid history JSON"); }
     }
 
     let renderedProductIds: string[] = [];
     if (req.body.renderedProductIds) {
-      try { renderedProductIds = JSON.parse(req.body.renderedProductIds as string); } catch { console.warn("[chat] Invalid renderedProductIds JSON"); }
+      try { renderedProductIds = JSON.parse(req.body.renderedProductIds as string); } catch { logger.warn("Invalid renderedProductIds JSON"); }
     }
 
     const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
@@ -363,7 +364,7 @@ chatRouter.post("/voice", upload.single("audio"), async (req: Request, res: Resp
     await recordConversationStats(req, conversationMode, result);
     res.json(result);
   } catch (err: any) {
-    console.error("Voice chat error:", err);
+    logger.error("Voice chat error", { error: (err instanceof Error ? err.message : String(err)) });
     res.status(500).json({ error: "Erreur interne du serveur" });
   }
 });

@@ -4,6 +4,8 @@ import helmet from "helmet";
 import dotenv from "dotenv";
 import { resolve } from "path";
 import { existsSync } from "fs";
+import { createServer } from "http";
+import { v4 as uuid } from "uuid";
 import { chatRouter } from "./routes/chat.js";
 import { ordersRouter } from "./routes/orders.js";
 import { productsRouter } from "./routes/products.js";
@@ -11,13 +13,17 @@ import { servicesRouter } from "./routes/services.js";
 import { adminRouter } from "./routes/admin.js";
 import { trackingRouter } from "./routes/tracking.js";
 import { requireAdmin } from "./middleware/auth.js";
+import { logger } from "./lib/logger.js";
+import { cacheClear } from "./lib/cache.js";
+import { supabase } from "./lib/supabase.js";
+import { initAdminWs, closeAdminWs } from "./lib/admin-ws.js";
 
 dotenv.config({ path: resolve(__dirname, "../../.env") });
 
 const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY", "GEMINI_API_KEYS"];
 const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
 if (missing.length > 0) {
-  console.error(`[FATAL] ENV manquantes: ${missing.join(", ")}`);
+  logger.error(`ENV manquantes: ${missing.join(", ")}`);
   process.exit(1);
 }
 
@@ -30,14 +36,20 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || "*" }));
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
+app.use((req, _res, next) => {
+  (req as any).requestId = uuid();
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
+  const rid = (req as any).requestId;
   res.on("finish", () => {
     const ms = Date.now() - start;
-    const line = `${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`;
-    if (res.statusCode >= 500) console.error(`[ERR] ${line}`);
-    else if (res.statusCode >= 400) console.warn(`[WARN] ${line}`);
-    else console.log(`[INFO] ${line}`);
+    const ctx = { requestId: rid, method: req.method, path: req.originalUrl, status: res.statusCode, ms };
+    if (res.statusCode >= 500) logger.error("Request failed", ctx);
+    else if (res.statusCode >= 400) logger.warn("Request warning", ctx);
+    else logger.info("Request OK", ctx);
   });
   next();
 });
@@ -59,15 +71,15 @@ app.get("/health", (_req, res) => {
 });
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error("[ERROR]", err instanceof Error ? err.message : err);
-  if (err instanceof Error) console.error(err.stack);
+  const msg = err instanceof Error ? err.message : String(err);
+  logger.error("Unhandled error", { error: msg });
+  if (err instanceof Error) logger.error(err.stack || "");
   res.status(500).json({
     error: "Internal server error",
-    message: process.env.NODE_ENV !== "production" ? (err instanceof Error ? err.message : String(err)) : undefined,
+    message: process.env.NODE_ENV !== "production" ? msg : undefined,
   });
 });
 
-// Serve React app in production
 const clientDist = resolve(__dirname, "../../client/dist");
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
@@ -82,8 +94,29 @@ if (existsSync(clientDist)) {
   });
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+const httpServer = createServer(app);
+initAdminWs(httpServer);
+
+httpServer.listen(PORT, () => {
+  logger.info(`Server running on http://localhost:${PORT}`);
 });
+
+function shutdown(signal: string) {
+  logger.info(`Received ${signal}, shutting down gracefully...`);
+  closeAdminWs();
+  httpServer.close(async () => {
+    cacheClear();
+    await supabase.auth.signOut().catch(() => {});
+    logger.info("Server shut down");
+    process.exit(0);
+  });
+  setTimeout(() => {
+    logger.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 10_000);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 export default app;

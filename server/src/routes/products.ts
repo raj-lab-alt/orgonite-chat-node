@@ -3,6 +3,25 @@ import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { getLegacyProducts } from "../lib/legacy-config.js";
 import { formatProduct } from "../lib/product-format.js";
+import { memoize, cacheDel } from "../lib/cache.js";
+import { logger } from "../lib/logger.js";
+
+const PRODUCT_TTL = 30_000;
+
+function cacheKey(isAdmin: boolean) { return isAdmin ? "products:admin" : "products:public"; }
+
+async function fetchProducts(isAdmin: boolean) {
+  let query = supabase.from("products").select("*");
+  if (!isAdmin) query = query.eq("visible", true);
+  const { data, error } = await query.order(isAdmin ? "created_at" : "name", { ascending: !isAdmin });
+  if (error) throw new Error(error.message);
+  return (data || []).map(formatProduct);
+}
+
+function invalidateProductCache() {
+  cacheDel("products:admin");
+  cacheDel("products:public");
+}
 
 export const productsRouter = Router();
 
@@ -10,22 +29,10 @@ export const productsRouter = Router();
 productsRouter.get("/", async (_req: Request, res: Response) => {
   try {
     const isAdminMount = _req.baseUrl.includes("/api/admin/");
-    let query = supabase
-      .from("products")
-      .select("*");
-
-    if (!isAdminMount) {
-      query = query.eq("visible", true);
-    }
-
-    const { data, error } = await query.order(isAdminMount ? "created_at" : "name", {
-      ascending: !isAdminMount,
-    });
-
-    if (error) return res.status(500).json({ error: error.message });
-
-    res.json((data || []).map(formatProduct));
+    const products = await memoize(cacheKey(isAdminMount), () => fetchProducts(isAdminMount), PRODUCT_TTL);
+    res.json(products);
   } catch (err: any) {
+    logger.error("Failed to fetch products", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -33,14 +40,10 @@ productsRouter.get("/", async (_req: Request, res: Response) => {
 // Admin: list all products
 productsRouter.get("/admin", requireAdmin, async (_req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) return res.status(500).json({ error: error.message });
-    res.json((data || []).map(formatProduct));
+    const products = await memoize("products:admin", () => fetchProducts(true), PRODUCT_TTL);
+    res.json(products);
   } catch (err: any) {
+    logger.error("Failed to fetch admin products", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -79,8 +82,10 @@ productsRouter.post("/", requireAdmin, async (req: Request, res: Response) => {
     const { error } = await supabase.from("products").insert(product);
     if (error) return res.status(500).json({ error: error.message });
 
+    invalidateProductCache();
     res.json({ success: true, id: body.id });
   } catch (err: any) {
+    logger.error("Failed to create product", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -139,8 +144,10 @@ productsRouter.put("/:id", requireAdmin, async (req: Request, res: Response) => 
       .eq("id", req.params.id);
 
     if (error) return res.status(500).json({ error: error.message });
+    invalidateProductCache();
     res.json({ success: true, id: req.params.id });
   } catch (err: any) {
+    logger.error("Failed to update product", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -154,8 +161,10 @@ productsRouter.delete("/:id", requireAdmin, async (req: Request, res: Response) 
       .eq("id", req.params.id);
 
     if (error) return res.status(500).json({ error: error.message });
+    invalidateProductCache();
     res.json({ success: true, deleted: true });
   } catch (err: any) {
+    logger.error("Failed to delete product", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
@@ -174,7 +183,7 @@ productsRouter.post("/sync", requireAdmin, async (req: Request, res: Response) =
 
       const slug = p.slug || p.id.replace(/_/g, "-");
       let existing: any = null;
-      try { existing = await supabase.from("products").select("id").eq("id", p.id).single(); } catch { console.warn("[products] Failed to fetch existing product", p.id); }
+      try { existing = await supabase.from("products").select("id").eq("id", p.id).single(); } catch { logger.warn("Failed to fetch existing product for sync", { id: p.id }); }
 
       const productData = {
         id: p.id,
@@ -211,8 +220,10 @@ productsRouter.post("/sync", requireAdmin, async (req: Request, res: Response) =
       }
     }
 
+    invalidateProductCache();
     res.json({ success: true, imported });
   } catch (err: any) {
+    logger.error("Failed to sync products", { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });

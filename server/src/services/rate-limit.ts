@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase.js";
+import { logger } from "../lib/logger.js";
 
 const WINDOW_SECONDS = 60;
 const MAX_REQUESTS = 10;
@@ -18,7 +19,7 @@ export async function checkRateLimit(
 
   if (error) {
     // If RPC doesn't exist yet (migration not run), fall back to best-effort
-    console.warn("[rate-limit] RPC unavailable, using fallback:", error.message);
+    logger.warn("RPC unavailable, using fallback", { error: error.message });
     await fallbackCheck(ip, maxRequests, windowSeconds);
     return;
   }
