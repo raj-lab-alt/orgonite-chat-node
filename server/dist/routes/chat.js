@@ -260,14 +260,22 @@ async function generateChatResult(message, extraFields, history, productId, conv
 }
 async function handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed = false, renderedProductIds = []) {
     try {
-        res.writeHead(200, {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-        });
+        if (!res.headersSent) {
+            res.writeHead(200, {
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache, no-transform",
+                Connection: "keep-alive",
+                "X-Accel-Buffering": "no",
+            });
+        }
     }
     catch {
+        if (!res.writableEnded) {
+            try {
+                res.end();
+            }
+            catch { }
+        }
         return;
     }
     const reqAborted = () => req.destroyed;
@@ -287,8 +295,13 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
     }
     catch (err) {
         logger_js_1.logger.error("handleChatSSE config error", { error: err.message });
-        if (!res.writableEnded)
+        if (!res.writableEnded) {
+            try {
+                res.write(`data: ${JSON.stringify({ error: "Erreur de configuration" })}\n\n`);
+            }
+            catch { }
             res.end();
+        }
         return;
     }
     // Phase 1: stream Gemini tokens immediately
@@ -510,53 +523,56 @@ exports.chatRouter.post("/", (req, res) => {
     }, 0);
 });
 // POST /api/chat/voice — audio message
-exports.chatRouter.post("/voice", upload.single("audio"), async (req, res) => {
-    try {
-        await (0, rate_limit_js_1.checkRateLimit)(req.ip);
-        if (!req.file) {
-            return res.status(400).json({ error: "Fichier audio manquant" });
-        }
-        const audioBase64 = req.file.buffer.toString("base64");
-        const audioMimeType = req.file.mimetype || "audio/webm";
-        const message = (req.body.message || "").slice(0, 2000);
-        const productId = req.body.productId || null;
-        const productType = req.body.productType || "general";
-        const conversationMode = req.body.conversationMode || "";
-        let history = [];
-        if (req.body.history) {
-            try {
-                history = JSON.parse(req.body.history);
+exports.chatRouter.post("/voice", upload.single("audio"), (req, res) => {
+    setTimeout(async () => {
+        try {
+            await (0, rate_limit_js_1.checkRateLimit)(req.ip);
+            if (!req.file) {
+                res.status(400).json({ error: "Fichier audio manquant" });
+                return;
             }
-            catch {
-                logger_js_1.logger.warn("Invalid history JSON");
+            const audioBase64 = req.file.buffer.toString("base64");
+            const audioMimeType = req.file.mimetype || "audio/webm";
+            const message = (req.body.message || "").slice(0, 2000);
+            const productId = req.body.productId || null;
+            const productType = req.body.productType || "general";
+            const conversationMode = req.body.conversationMode || "";
+            let history = [];
+            if (req.body.history) {
+                try {
+                    history = JSON.parse(req.body.history);
+                }
+                catch {
+                    logger_js_1.logger.warn("Invalid history JSON");
+                }
+            }
+            let renderedProductIds = [];
+            if (req.body.renderedProductIds) {
+                try {
+                    renderedProductIds = JSON.parse(req.body.renderedProductIds);
+                }
+                catch {
+                    logger_js_1.logger.warn("Invalid renderedProductIds JSON");
+                }
+            }
+            const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
+            const wantsStream = req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
+            if (wantsStream) {
+                await handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
+                return;
+            }
+            const result = await generateChatResult(message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
+            await recordConversationStats(req, conversationMode, result);
+            res.json(result);
+        }
+        catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            logger_js_1.logger.error("Voice chat error", { error: errMsg });
+            if (!res.headersSent) {
+                const status = errorStatus(err);
+                res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
             }
         }
-        let renderedProductIds = [];
-        if (req.body.renderedProductIds) {
-            try {
-                renderedProductIds = JSON.parse(req.body.renderedProductIds);
-            }
-            catch {
-                logger_js_1.logger.warn("Invalid renderedProductIds JSON");
-            }
-        }
-        const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
-        const wantsStream = req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
-        if (wantsStream) {
-            await handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
-            return;
-        }
-        const result = await generateChatResult(message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
-        await recordConversationStats(req, conversationMode, result);
-        res.json(result);
-    }
-    catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        logger_js_1.logger.error("Voice chat error", { error: errMsg });
-        if (!res.headersSent) {
-            const status = errorStatus(err);
-            res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
-        }
-    }
+    }, 0);
 });
 //# sourceMappingURL=chat.js.map

@@ -285,13 +285,16 @@ async function handleChatSSE(
   renderedProductIds: string[] = [],
 ) {
   try {
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    });
+    if (!res.headersSent) {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
+    }
   } catch {
+    if (!res.writableEnded) { try { res.end(); } catch {} }
     return;
   }
 
@@ -313,7 +316,10 @@ async function handleChatSSE(
     systemPrompt = getSystemPrompt(catalog, dbSystemPrompt, catalogItemTemplate, productType);
   } catch (err: any) {
     logger.error("handleChatSSE config error", { error: err.message });
-    if (!res.writableEnded) res.end();
+    if (!res.writableEnded) {
+      try { res.write(`data: ${JSON.stringify({ error: "Erreur de configuration" })}\n\n`); } catch {}
+      res.end();
+    }
     return;
   }
 
@@ -548,49 +554,52 @@ chatRouter.post("/", (req: Request, res: Response) => {
 });
 
 // POST /api/chat/voice — audio message
-chatRouter.post("/voice", upload.single("audio"), async (req: Request, res: Response) => {
-  try {
-    await checkRateLimit(req.ip);
+chatRouter.post("/voice", upload.single("audio"), (req: Request, res: Response) => {
+  setTimeout(async () => {
+    try {
+      await checkRateLimit(req.ip);
 
-    if (!req.file) {
-      return res.status(400).json({ error: "Fichier audio manquant" });
+      if (!req.file) {
+        res.status(400).json({ error: "Fichier audio manquant" });
+        return;
+      }
+
+      const audioBase64 = req.file.buffer.toString("base64");
+      const audioMimeType = req.file.mimetype || "audio/webm";
+      const message = ((req.body.message as string) || "").slice(0, 2000);
+      const productId = (req.body.productId as string) || null;
+      const productType = (req.body.productType as string) || "general";
+      const conversationMode = (req.body.conversationMode as string) || "";
+
+      let history: any[] = [];
+      if (req.body.history) {
+        try { history = JSON.parse(req.body.history as string); } catch { logger.warn("Invalid history JSON"); }
+      }
+
+      let renderedProductIds: string[] = [];
+      if (req.body.renderedProductIds) {
+        try { renderedProductIds = JSON.parse(req.body.renderedProductIds as string); } catch { logger.warn("Invalid renderedProductIds JSON"); }
+      }
+
+      const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
+      const wantsStream = req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
+      if (wantsStream) {
+        await handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
+        return;
+      }
+
+      const result = await generateChatResult(
+        message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds
+      );
+      await recordConversationStats(req, conversationMode, result);
+      res.json(result);
+    } catch (err: any) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error("Voice chat error", { error: errMsg });
+      if (!res.headersSent) {
+        const status = errorStatus(err);
+        res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
+      }
     }
-
-    const audioBase64 = req.file.buffer.toString("base64");
-    const audioMimeType = req.file.mimetype || "audio/webm";
-    const message = ((req.body.message as string) || "").slice(0, 2000);
-    const productId = (req.body.productId as string) || null;
-    const productType = (req.body.productType as string) || "general";
-    const conversationMode = (req.body.conversationMode as string) || "";
-
-    let history: any[] = [];
-    if (req.body.history) {
-      try { history = JSON.parse(req.body.history as string); } catch { logger.warn("Invalid history JSON"); }
-    }
-
-    let renderedProductIds: string[] = [];
-    if (req.body.renderedProductIds) {
-      try { renderedProductIds = JSON.parse(req.body.renderedProductIds as string); } catch { logger.warn("Invalid renderedProductIds JSON"); }
-    }
-
-    const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
-    const wantsStream = req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
-    if (wantsStream) {
-      await handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
-      return;
-    }
-
-    const result = await generateChatResult(
-      message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds
-    );
-    await recordConversationStats(req, conversationMode, result);
-    res.json(result);
-  } catch (err: any) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    logger.error("Voice chat error", { error: errMsg });
-    if (!res.headersSent) {
-      const status = errorStatus(err);
-      res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
-    }
-  }
+  }, 0);
 });
