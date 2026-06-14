@@ -807,7 +807,23 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
           const inferredProduct = inferredProducts.find(p => p && (p.id === id || p.slug === id));
           const product = apiProduct || inferredProduct || productCatalog.find(p => p.id === id || p.slug === id);
           if (!product) return;
-          messagesEl.insertBefore(renderProductCardWithButtons(product), anchor);
+          const cardEl = renderProductCardWithButtons(product);
+          messagesEl.insertBefore(cardEl, anchor);
+          requestAnimationFrame(() => {
+            const rect = cardEl.getBoundingClientRect();
+            console.log('[DEBUG card render]', JSON.stringify({
+              tag: cardEl.tagName,
+              className: cardEl.className,
+              w: Math.round(rect.width),
+              h: Math.round(rect.height),
+              x: Math.round(rect.x),
+              y: Math.round(rect.y),
+              vis: rect.width > 0 && rect.height > 0,
+              scrollH: messagesEl.scrollHeight,
+              scrollTop: messagesEl.scrollTop,
+              clientH: messagesEl.clientHeight,
+            }));
+          });
           scrollChatToBottom('smooth', true);
         }, delay + i * 200);
       });
