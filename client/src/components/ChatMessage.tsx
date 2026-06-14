@@ -37,6 +37,11 @@ export function ChatMessageBubble({
       return;
     }
 
+    if (isStreaming) {
+      setDisplayed(displayContent);
+      return;
+    }
+
     indexRef.current = 0;
     setDisplayed("");
 
@@ -52,7 +57,7 @@ export function ChatMessageBubble({
     }, 15);
 
     return () => clearInterval(interval);
-  }, [displayContent, isUser]);
+  }, [displayContent, isUser, isStreaming]);
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
