@@ -83,6 +83,17 @@ function stripPrematureUpsell(reply: string, message: string, orderConfirmed: bo
   return cleaned || reply;
 }
 
+function productNameInMessage(message: string, products: any[]): Set<string> {
+  const lower = message.toLowerCase();
+  const mentioned = new Set<string>();
+  for (const p of products) {
+    if (p.name && lower.includes(p.name.toLowerCase())) {
+      mentioned.add(p.id);
+    }
+  }
+  return mentioned;
+}
+
 async function generateChatResult(
   message: string,
   extraFields: any,
@@ -92,6 +103,7 @@ async function generateChatResult(
   isVoice: boolean,
   productType: string,
   orderConfirmed = false,
+  renderedProductIds: string[] = [],
 ): Promise<ChatResult> {
   const { apiKeys, models, products, statuses, systemPrompt: dbSystemPrompt, catalogItemTemplate } = await getConfig();
   const catalog = catalogProducts(products);
@@ -137,6 +149,19 @@ async function generateChatResult(
     userMessage: recentConversationText(history, message),
   });
 
+  // Dedup: don't re-render cards already shown in this conversation,
+  // unless the user explicitly mentions the product by name
+  if (renderedProductIds.length > 0 && productList.length > 0) {
+    const mentionedIds = productNameInMessage(message, products);
+    const filtered = productList.filter(
+      (p: any) => !renderedProductIds.includes(p.id) || mentionedIds.has(p.id)
+    );
+    if (filtered.length !== productList.length) {
+      console.log(`[DEDUP] filtered ${productList.length - filtered.length} already-rendered products`);
+      productList.splice(0, productList.length, ...filtered);
+    }
+  }
+
   let cleanFinalReply = reply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
 
   // Guard: if Gemini invented a product (no valid RENDER_PRODUCT tag found, but brackets with invented names remain)
@@ -162,6 +187,7 @@ async function handleChatSSE(
   isVoice: boolean,
   productType: string,
   orderConfirmed = false,
+  renderedProductIds: string[] = [],
 ) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -170,7 +196,7 @@ async function handleChatSSE(
   });
 
   const result = await generateChatResult(
-    message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed
+    message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed, renderedProductIds
   );
   res.write(`data: ${JSON.stringify({ text: result.reply })}\n\n`);
   res.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
@@ -190,6 +216,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
       productType: z.string().default("general"),
       conversationMode: z.string().default(""),
       history: z.array(z.any()).default([]),
+      renderedProductIds: z.array(z.string()).default([]),
       orderConfirmed: z.boolean().default(false),
       stream: z.boolean().optional(),
     }).refine((value) => value.message.trim().length > 0 || Boolean(value.imageBase64), {
@@ -211,12 +238,12 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
     const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
     if (wantsStream) {
-      await handleChatSSE(res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed);
+      await handleChatSSE(res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
       return;
     }
 
     const result = await generateChatResult(
-      message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed
+      message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds
     );
     res.json(result);
   } catch (err: any) {
@@ -251,15 +278,20 @@ chatRouter.post("/voice", upload.single("audio"), async (req: Request, res: Resp
       try { history = JSON.parse(req.body.history as string); } catch {}
     }
 
+    let renderedProductIds: string[] = [];
+    if (req.body.renderedProductIds) {
+      try { renderedProductIds = JSON.parse(req.body.renderedProductIds as string); } catch {}
+    }
+
     const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
     const wantsStream = req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
     if (wantsStream) {
-      await handleChatSSE(res, message, extraFields, history, productId, conversationMode, true, productType, false);
+      await handleChatSSE(res, message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
       return;
     }
 
     const result = await generateChatResult(
-      message, extraFields, history, productId, conversationMode, true, productType, false
+      message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds
     );
     res.json(result);
   } catch (err: any) {

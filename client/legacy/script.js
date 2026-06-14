@@ -437,6 +437,7 @@ let welcomeLock = false;
 let pendingProductId = null;
 let currentProduct = null;
 let conversationMode = 'A';
+let renderedProductIds = [];
 const trackedPurchaseIds = new Set();
 
 function pushHistory(msg) {
@@ -699,6 +700,7 @@ window.sendOrderIntent = async function(productName) {
         productType: currentProduct?.productType || 'general',
         conversationMode,
         orderConfirmed: true,
+        renderedProductIds,
         history: conversationHistory.slice(0, -1).map(msg => ({
           role: msg.role, text: msg.text,
           imageBase64: msg.imageBase64, imageMimeType: msg.imageMimeType
@@ -820,6 +822,7 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
           }));
           const cardEl = renderProductCardWithButtons(product);
           messagesEl.insertBefore(cardEl, anchor);
+          if (!renderedProductIds.includes(id)) renderedProductIds.push(id);
           requestAnimationFrame(() => {
             const rect = cardEl.getBoundingClientRect();
             console.log('[DEBUG card render]', JSON.stringify({
@@ -973,6 +976,7 @@ async function sendMessage() {
         productType: currentProduct?.productType || 'general',
         conversationMode,
         orderConfirmed: false,
+        renderedProductIds,
         history: conversationHistory.slice(0, -1).map(msg => ({
           role: msg.role, text: msg.text,
           imageBase64: msg.imageBase64, imageMimeType: msg.imageMimeType
@@ -1965,6 +1969,7 @@ micBtn.addEventListener('click', async () => {
         formData.append('productType', currentProduct?.productType || 'general');
         formData.append('orderConfirmed', 'false');
         formData.append('conversationMode', conversationMode);
+        formData.append('renderedProductIds', JSON.stringify(renderedProductIds));
         formData.append('history', JSON.stringify(conversationHistory.slice(0, -1).map(msg => ({
           role: msg.role, text: msg.text,
           imageBase64: msg.imageBase64, imageMimeType: msg.imageMimeType
