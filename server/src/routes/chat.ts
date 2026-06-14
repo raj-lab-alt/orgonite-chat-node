@@ -261,12 +261,90 @@ async function handleChatSSE(
     Connection: "keep-alive",
   });
 
-  const result = await generateChatResult(
-    message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed, renderedProductIds
-  );
+  const reqAborted = () => req.destroyed;
+  const { apiKeys, models, products, statuses, systemPrompt: dbSystemPrompt, catalogItemTemplate } = await getConfig();
+  const catalog = catalogProducts(products);
+  const systemPrompt = getSystemPrompt(catalog, dbSystemPrompt, catalogItemTemplate, productType);
+
+  // Phase 1: stream Gemini tokens immediately
+  let fullReply = "";
+  try {
+    const stream = chatGeminiRequestStream(
+      message, extraFields, history, productId, conversationMode,
+      isVoice, productType, systemPrompt, apiKeys, models
+    );
+
+    for await (const chunk of stream) {
+      if (reqAborted()) { res.end(); return; }
+      fullReply += chunk;
+      res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+    }
+  } catch (err: any) {
+    logger.error("Gemini chat error", { error: err.message });
+    if (!fullReply) {
+      fullReply = "Desole, une erreur est survenue. Veuillez reessayer.";
+      res.write(`data: ${JSON.stringify({ text: fullReply })}\n\n`);
+    }
+  }
+
+  // Phase 2: process order + products
+  const visibleReply = sanitizeAssistantReply(fullReply);
+  const { cleanReply, orderData } = detectOrderFromReply(visibleReply);
+  let savedOrder = null;
+  let orderValidationReply = "";
+
+  if (orderData) {
+    const normalized = normalizeOrderPayload(orderData);
+    normalized.id = generateOrderId();
+    normalized.date = new Date().toISOString();
+    normalized.statut = statuses[0];
+
+    const missing = missingOrderFields(normalized);
+    if (missing.length > 0) {
+      logger.warn(`Incomplete order ignored. Missing: ${missing.join(", ")}`);
+      orderValidationReply =
+        "Il me manque encore quelques informations pour enregistrer la commande : " +
+        missing.join(", ") +
+        ". Peux-tu me les envoyer ?";
+    } else {
+      const productPriceRefs = products.map((p: any) => ({ name: p.name, price: p.price, id: p.id }));
+      applyOrderAmounts(normalized, productPriceRefs);
+      const saved = await saveOrderWithoutDuplicate(normalized, statuses, productPriceRefs);
+      savedOrder = orderResponse(saved.order, saved.created);
+    }
+  }
+
+  const reply = stripPrematureUpsell(orderValidationReply || cleanReply || visibleReply, message, orderConfirmed, Boolean(savedOrder));
+  const { productData, productList } = detectProductsFromReply(reply, products, {
+    productId,
+    productType,
+    userMessage: recentConversationText(history, message),
+  });
+
+  if (renderedProductIds.length > 0 && productList.length > 0) {
+    const mentionedIds = productNameInMessage(message, products);
+    const filtered = productList.filter(
+      (p: any) => !renderedProductIds.includes(p.id) || mentionedIds.has(p.id)
+    );
+    if (filtered.length !== productList.length) {
+      logger.info(`filtered ${productList.length - filtered.length} already-rendered products`);
+      productList.splice(0, productList.length, ...filtered);
+    }
+  }
+
+  // Strip RENDER_PRODUCT tags from what the user sees (they were streamed with them)
+  let replyForClient = fullReply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+  if (productList.length === 0) {
+    replyForClient = replyForClient
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\[[^\]]+\]/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
+  const result: ChatResult = { reply: replyForClient, order: savedOrder, product: productData, products: productList };
   await recordConversationStats(req, conversationMode, result);
-  res.write(`data: ${JSON.stringify({ text: result.reply })}\n\n`);
-  res.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
+  res.write(`data: ${JSON.stringify({ done: true, reply: result.reply, order: result.order, product: result.product, products: result.products })}\n\n`);
   res.write("data: [DONE]\n\n");
   res.end();
 }
