@@ -64,7 +64,7 @@ export default function ConfigPage() {
         <textarea
           value={welcomeMessage}
           onChange={(e) => setWelcomeMessage(e.target.value)}
-          className="w-full border rounded px-3 py-2 text-xs leading-relaxed"
+          className="w-full border rounded px-3 py-2 text-xs leading-relaxed bg-background text-foreground"
           rows={4}
         />
       </div>
@@ -80,7 +80,7 @@ export default function ConfigPage() {
         <textarea
           value={systemPrompt}
           onChange={(e) => setSystemPrompt(e.target.value)}
-          className="w-full border rounded px-3 py-2 text-xs font-mono leading-relaxed"
+          className="w-full border rounded px-3 py-2 text-xs font-mono leading-relaxed bg-background text-foreground"
           rows={20}
         />
       </div>
