@@ -234,7 +234,7 @@ export default function ChatPage() {
   const showPageView = view === "product" || view === "service";
 
   return (
-    <div className="flex flex-col h-dvh bg-background">
+    <div className="chat-container flex flex-col h-dvh bg-background">
       {/* SPA Navigation */}
       <nav className={`shrink-0 bg-background border-b border-primary/10 px-4 py-3 flex items-center gap-3 ${showPageView ? "" : "hidden"}`}>
         <button

@@ -6,6 +6,7 @@ import type { ProductType } from "@/stores/chat-store";
 import { fetchProducts } from "@/lib/api";
 import ChatPage from "@/pages/Chat/ChatPage";
 import AdminPage from "@/pages/Admin/AdminPage";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function HomePage() {
   const [searchParams] = useSearchParams();
@@ -37,10 +38,12 @@ function HomePage() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/admin/*" element={<AdminPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/admin/*" element={<AdminPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }

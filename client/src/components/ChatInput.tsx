@@ -85,7 +85,7 @@ export function ChatInput({ onSend, onStartVoice, isStreaming, disabled }: ChatI
       <div className="flex items-end gap-2">
         <button
           onClick={() => fileRef.current?.click()}
-          className="p-2 rounded-md hover:bg-muted text-muted-foreground"
+          className="p-2 rounded-md bg-muted/50 text-muted-foreground hover:bg-muted"
           disabled={disabled}
         >
           <Image size={20} />
@@ -100,7 +100,7 @@ export function ChatInput({ onSend, onStartVoice, isStreaming, disabled }: ChatI
 
         <button
           onClick={onStartVoice}
-          className="p-2 rounded-md hover:bg-muted text-muted-foreground"
+          className="p-2 rounded-md bg-muted/50 text-muted-foreground hover:bg-muted"
           disabled={disabled || isStreaming}
         >
           <Mic size={20} />
