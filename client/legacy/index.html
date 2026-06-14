@@ -615,7 +615,17 @@
       display: none;
       flex: 1;
       overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
       padding: 0;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(140, 110, 255, 0.3) transparent;
+    }
+    #pageView::-webkit-scrollbar { width: 2px; }
+    #pageView::-webkit-scrollbar-track { background: transparent; }
+    #pageView::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, rgba(140, 110, 255, 0.3), rgba(140, 110, 255, 0.05));
+      border-radius: 4px;
     }
     #pageView.visible { display: block; }
     #pageView .cod-product-page {
