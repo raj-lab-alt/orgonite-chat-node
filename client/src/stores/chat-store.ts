@@ -1,5 +1,27 @@
 import { create } from "zustand";
 
+export interface ProductData {
+  id: string;
+  name?: string;
+  slug?: string;
+  price?: number;
+  currency?: string;
+  imageUrl?: string;
+  image_url?: string;
+  images?: string[];
+  productType?: string;
+  prix?: number;
+  [key: string]: unknown;
+}
+
+export interface OrderData {
+  id: string;
+  produit?: string;
+  totalCommande?: number;
+  statut?: string;
+  [key: string]: unknown;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -7,9 +29,9 @@ export interface ChatMessage {
   timestamp: number;
   imageBase64?: string;
   imageMimeType?: string;
-  product?: any;
-  products?: any[];
-  order?: any;
+  product?: ProductData;
+  products?: ProductData[];
+  order?: OrderData;
 }
 
 export type ConversationMode = "A" | "B" | "C";

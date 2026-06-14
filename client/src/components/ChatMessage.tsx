@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import type { ProductData, OrderData } from "@/stores/chat-store";
 
 interface ChatMessageProps {
   role: "user" | "assistant";
@@ -7,9 +8,9 @@ interface ChatMessageProps {
   isStreaming?: boolean;
   imageBase64?: string;
   imageMimeType?: string;
-  product?: any;
-  products?: any[];
-  order?: any;
+  product?: ProductData;
+  products?: ProductData[];
+  order?: OrderData;
   onOrderProduct?: (productName: string) => void;
 }
 
@@ -89,7 +90,7 @@ export function ChatMessageBubble({
 
         {productCards.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
-            {productCards.map((p: any) => (
+            {productCards.map((p: ProductData) => (
               <MiniProductCard key={p.id} product={p} onOrder={onOrderProduct} />
             ))}
           </div>
@@ -99,7 +100,7 @@ export function ChatMessageBubble({
   );
 }
 
-function MiniProductCard({ product, onOrder }: { product: any; onOrder?: (name: string) => void }) {
+function MiniProductCard({ product, onOrder }: { product: ProductData; onOrder?: (name: string) => void }) {
   const imageUrl = getProductImage(product);
   const name = product.name || "Produit";
   const price = product.price ?? product.prix ?? "";
@@ -141,11 +142,11 @@ function cleanMessageContent(content: string) {
     .trim();
 }
 
-function uniqueProducts(product?: any, products?: any[]) {
-  const list = [product, ...(products || [])].filter(Boolean);
+function uniqueProducts(product?: ProductData, products?: ProductData[]) {
+  const list = [product, ...(products || [])].filter(Boolean) as ProductData[];
   const seen = new Set<string>();
 
-  return list.filter((item: any) => {
+  return list.filter((item) => {
     const key = String(item.id || item.slug || item.name || JSON.stringify(item));
     if (seen.has(key)) return false;
     seen.add(key);
@@ -153,7 +154,7 @@ function uniqueProducts(product?: any, products?: any[]) {
   });
 }
 
-function getProductImage(product: any) {
+function getProductImage(product: ProductData) {
   if (product.imageUrl) return product.imageUrl;
   if (product.image_url) return product.image_url;
   if (Array.isArray(product.images) && product.images.length > 0) return product.images[0];

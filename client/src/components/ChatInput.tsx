@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
 import { Image, Mic, Send, Square } from "lucide-react";
 
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+
 interface ChatInputProps {
   onSend: (text: string, imageBase64?: string, imageMimeType?: string) => void;
   onStartVoice: () => void;
@@ -30,10 +32,8 @@ export function ChatInput({ onSend, onStartVoice, isStreaming, disabled }: ChatI
     }
   };
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const loadPreview = (file: File) => {
+    if (file.size > MAX_IMAGE_BYTES) return;
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
@@ -41,7 +41,12 @@ export function ChatInput({ onSend, onStartVoice, isStreaming, disabled }: ChatI
       setPreview({ data: base64, mime: file.type });
     };
     reader.readAsDataURL(file);
+  };
 
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    loadPreview(file);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -53,13 +58,7 @@ export function ChatInput({ onSend, onStartVoice, isStreaming, disabled }: ChatI
       if (item.type.startsWith("image/")) {
         const file = item.getAsFile();
         if (!file) continue;
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const base64 = result.split(",")[1];
-          setPreview({ data: base64, mime: file.type });
-        };
-        reader.readAsDataURL(file);
+        loadPreview(file);
         break;
       }
     }

@@ -70,9 +70,9 @@ export interface ChatMessage {
   timestamp: string;
   imageBase64?: string;
   imageMimeType?: string;
-  product?: any;
-  products?: any[];
-  order?: any;
+  product?: Product;
+  products?: Product[];
+  order?: Order;
 }
 
 export interface TrackingConfig {

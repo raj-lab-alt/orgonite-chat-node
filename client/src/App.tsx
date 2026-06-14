@@ -1,38 +1,40 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, useParams, Navigate } from "react-router-dom";
+import type { ProductData } from "@/stores/chat-store";
 import { useChatStore } from "@/stores/chat-store";
+import type { ProductType } from "@/stores/chat-store";
 import { fetchProducts } from "@/lib/api";
 import ChatPage from "@/pages/Chat/ChatPage";
 import AdminPage from "@/pages/Admin/AdminPage";
 
-// Map URL slugs to product IDs and types
-const PRODUCT_ROUTES: Record<string, { id: string; type: string; mode: "B" | "C" }> = {
-  "coeur-vert-protection": { id: "coeur_vert_protection", type: "protection", mode: "B" },
-  "coeur-amethyste": { id: "coeur_amethyste", type: "spiritual", mode: "B" },
-  "coeur-rose-amour": { id: "coeur_rose_amour", type: "love", mode: "B" },
-  "cone-voiture": { id: "cone_voiture", type: "protection", mode: "B" },
-  "dome-abondance": { id: "dome_abondance", type: "abundance", mode: "B" },
-  "anti-ondes": { id: "orgonite_anti_ondes", type: "protection", mode: "B" },
-  "islamique": { id: "orgonite_islamique", type: "islamic", mode: "B" },
-  "orgondisc-recharge": { id: "orgonedisc_recharge", type: "accessory", mode: "B" },
-  "personnalisee": { id: "orgonite_perso", type: "custom", mode: "C" },
-};
+function productMode(productType: string): "B" | "C" {
+  return productType === "custom" ? "C" : "B";
+}
 
 function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
-  const route = slug ? PRODUCT_ROUTES[slug] : null;
+  const [loading, setLoading] = useState(true);
+  const [found, setFound] = useState(false);
   const setProduct = useChatStore((s) => s.setProduct);
   const setMode = useChatStore((s) => s.setMode);
-  const reset = useChatStore((s) => s.reset);
 
   useEffect(() => {
-    if (route) {
-      setProduct(route.id, route.type as any);
-      setMode(route.mode);
-    }
+    setLoading(true);
+    setFound(false);
+    fetchProducts().then((products: ProductData[]) => {
+      const p = products.find((p) => p.slug === slug);
+      if (p) {
+        const type = (p.productType || "general") as ProductType;
+        setProduct(p.id, type);
+        setMode(productMode(type));
+        setFound(true);
+      }
+      setLoading(false);
+    });
   }, [slug]);
 
-  if (!route) return <Navigate to="/" replace />;
+  if (loading) return null;
+  if (!found) return <Navigate to="/" replace />;
 
   return <ChatPage key={slug} />;
 }

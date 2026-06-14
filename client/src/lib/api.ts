@@ -1,4 +1,6 @@
-const BASE = ""; // proxied by Vite
+import type { ProductData, OrderData } from "@/stores/chat-store";
+
+const BASE = import.meta.env.VITE_API_BASE ?? "";
 
 function getSessionKey() {
   const storageKey = "orgonite_session_key";
@@ -42,7 +44,7 @@ export interface SendMessageParams {
   history?: { role: string; text?: string; imageBase64?: string; imageMimeType?: string }[];
   orderConfirmed?: boolean;
   onChunk: (text: string) => void;
-  onDone: (data: { reply: string; order?: any; product?: any; products?: any[] }) => void;
+  onDone: (data: { reply: string; order?: OrderData; product?: ProductData; products?: ProductData[] }) => void;
   onError: (err: string) => void;
   signal?: AbortSignal;
 }
@@ -143,7 +145,7 @@ export async function sendVoiceMessage(params: {
   conversationMode?: string;
   history?: string;
   onChunk: (text: string) => void;
-  onDone: (data: { reply: string; order?: any; product?: any; products?: any[] }) => void;
+  onDone: (data: { reply: string; order?: OrderData; product?: ProductData; products?: ProductData[] }) => void;
   onError: (err: string) => void;
 }) {
   try {
