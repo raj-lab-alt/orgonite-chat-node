@@ -1397,6 +1397,7 @@ function injectCodProductStyles() {
       width: 100%; max-width: 360px;
       align-self: flex-start;
       align-items: flex-start;
+      overflow: hidden;
       margin: 4px 0 14px;
       border-radius: 14px;
       background: rgba(18, 18, 32, 0.96);
@@ -1438,6 +1439,7 @@ function injectCodProductStyles() {
       flex-wrap: wrap;
     }
     .chat-product-actions .cod-btn {
+      display: inline-flex; width: auto;
       padding: 6px 14px;
       border-radius: 8px;
       font-size: 12px;
