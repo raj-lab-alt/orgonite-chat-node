@@ -293,6 +293,7 @@ async function handleChatSSE(
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
         "X-Passenger-Buffering": "no",
+        "X-LiteSpeed-Buffering": "no",
       });
     }
   } catch {
@@ -517,6 +518,7 @@ chatRouter.get("/test-sse", (_req: Request, res: Response) => {
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
     "X-Passenger-Buffering": "no",
+    "X-LiteSpeed-Buffering": "no",
   });
   const send = (data: any) => {
     try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch {}

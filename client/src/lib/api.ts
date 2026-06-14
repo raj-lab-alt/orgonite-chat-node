@@ -77,8 +77,8 @@ export async function sendMessage({
     orderConfirmed,
   };
 
-  // SSE désactivé temporairement
-  await tryJSON(body, onDone, onError, signal);
+  await trySSE(body, onChunk, onDone, onError, signal) ||
+    tryJSON(body, onDone, onError, signal);
 }
 
 async function trySSE(
