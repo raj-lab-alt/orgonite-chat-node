@@ -249,23 +249,24 @@ export default function ChatPage() {
       </nav>
 
       {/* Header */}
-      <header className="shrink-0 bg-background/92 border-b border-primary/10 px-4 py-3 flex items-center gap-3">
-        <div className="relative shrink-0" style={{ width: 44, height: 44 }}>
-          <div className="absolute inset-[-3px] rounded-full" style={{
+      <header className="shrink-0 bg-background/92 border-b border-primary/10 px-4 py-3 flex items-center gap-3 backdrop-blur-xl">
+        <div className="relative shrink-0">
+          <div className="w-[46px] h-[46px] rounded-full p-[2px]" style={{
             background: "conic-gradient(from 0deg, rgba(140,110,255,0.5), rgba(99,102,241,0.15), rgba(180,140,255,0.4), rgba(140,110,255,0.5))",
             animation: "avatarSpin 4s linear infinite",
-            WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))",
-            mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))",
-          }} />
-          <img
-            src="/amine-avatar.webp"
-            alt="Amine"
-            className="w-11 h-11 rounded-full object-cover relative"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-background animate-status-pulse" />
+          }}>
+            <img
+              src="/amine-avatar.webp"
+              alt="Amine"
+              className="w-full h-full rounded-full object-cover"
+              onError={(e) => {
+                const el = e.target as HTMLImageElement;
+                el.style.display = "none";
+                (el.parentNode as HTMLElement).style.background = "linear-gradient(135deg, #7c3aed, #6366f1)";
+              }}
+            />
+          </div>
+          <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-green-500 ring-2 ring-background animate-status-pulse" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
@@ -279,7 +280,7 @@ export default function ChatPage() {
       </header>
 
       {/* Trust Bar */}
-      <div className="shrink-0 flex justify-center items-center gap-3 px-2.5 py-1.5 bg-background/70 border-b border-primary/5 flex-wrap text-center">
+      <div className="shrink-0 flex justify-center items-center gap-3 px-2.5 py-1.5 bg-[#0c0c16]/70 border-b border-primary/5 flex-wrap text-center">
         <span className="text-[10.5px] text-muted-foreground/70">⭐⭐⭐⭐⭐ 4.9/5 — 1 247 avis vérifiés</span>
         <span className="text-[10.5px] text-muted-foreground/70">🇹🇳 Livraison dans toute la Tunisie</span>
         <span className="text-[10.5px] text-muted-foreground/70">💳 Paiement à la livraison</span>
@@ -335,19 +336,18 @@ export default function ChatPage() {
         <main className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
           {messages.length === 0 && !welcomeMsg && (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-              <div className="relative mb-4" style={{ width: 64, height: 64 }}>
-                <div className="absolute inset-[-4px] rounded-full" style={{
-                  background: "conic-gradient(from 0deg, rgba(140,110,255,0.5), rgba(99,102,241,0.15), rgba(180,140,255,0.4), rgba(140,110,255,0.5))",
-                  animation: "avatarSpin 4s linear infinite",
-                  WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))",
-                  mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))",
-                }} />
+              <div className="w-[68px] h-[68px] rounded-full p-[3px] mb-4" style={{
+                background: "conic-gradient(from 0deg, rgba(140,110,255,0.5), rgba(99,102,241,0.15), rgba(180,140,255,0.4), rgba(140,110,255,0.5))",
+                animation: "avatarSpin 4s linear infinite",
+              }}>
                 <img
                   src="/amine-avatar.webp"
                   alt="Amine"
-                  className="w-16 h-16 rounded-full object-cover relative"
+                  className="w-full h-full rounded-full object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
+                    const el = e.target as HTMLImageElement;
+                    el.style.display = "none";
+                    (el.parentNode as HTMLElement).style.background = "linear-gradient(135deg, #7c3aed, #6366f1)";
                   }}
                 />
               </div>
