@@ -1150,17 +1150,15 @@ function injectCodProductStyles() {
     .cod-hook strong { display: block; font-size: 21px; line-height: 1.3; margin-bottom: 8px; }
     .cod-hook p { color: #A0A8B8; }
     .cod-trust-strip {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
       gap: 8px;
-      overflow-x: auto;
       padding: 12px 16px;
-      scrollbar-width: none;
       border-top: 1px solid rgba(248, 246, 240, 0.07);
       border-bottom: 1px solid rgba(248, 246, 240, 0.07);
     }
-    .cod-trust-strip::-webkit-scrollbar { display: none; }
     .cod-trust-badge {
-      flex: 0 0 auto;
+      min-width: 0;
       min-height: 44px;
       display: inline-flex;
       align-items: center;
@@ -1171,7 +1169,8 @@ function injectCodProductStyles() {
       border: 1px solid rgba(124, 58, 237, 0.24);
       font-size: 12px;
       font-weight: 700;
-      white-space: nowrap;
+      line-height: 1.35;
+      white-space: normal;
     }
     .cod-benefit {
       display: grid;
