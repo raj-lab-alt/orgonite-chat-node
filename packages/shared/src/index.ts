@@ -2,63 +2,81 @@ export interface Product {
   id: string;
   name: string;
   slug: string;
-  description: string;
   price: number;
   currency: string;
-  images: string[];
-  category: string;
-  is_active: boolean;
-  welcome_sequence?: string[];
-  faq?: { question: string; answer: string }[];
-  reviews?: { author: string; rating: number; text: string }[];
+  imageUrl: string;
+  benefits: string;
+  composition: string;
+  taille: string;
+  accentColor: string;
+  productType: string;
+  welcomeSequence: string[];
+  stock: number;
+  hook: string;
+  hookTransition: string;
+  upsellPrice: number | null;
+  priceOriginal: number | null;
+  faq: { question: string; answer: string }[];
+  reviews: { author: string; rating: number; text: string }[];
+  visible: boolean;
   created_at: string;
 }
 
 export interface Service {
   id: string;
   name: string;
-  description: string;
+  slug: string;
+  subtitle: string;
   price: number;
-  currency: string;
-  duration_days: number;
-  is_active: boolean;
-  product_ids?: string[];
+  original_price: number | null;
+  icon: string;
+  imageUrl: string;
+  color: string;
+  description: string;
+  benefits: string;
+  duration: string;
+  format: string;
+  visible: boolean;
+  product_ids: string[];
   created_at: string;
 }
 
-export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "processing"
-  | "shipped"
-  | "delivered"
-  | "cancelled";
+export type OrderStatus = string;
 
 export interface Order {
   id: string;
-  customer_name: string;
-  phone: string;
-  address?: string;
-  product_id?: string;
-  product_name?: string;
-  quantity: number;
-  total: number;
-  currency: string;
-  status: OrderStatus;
-  notes?: string;
-  is_trashed: boolean;
+  nom: string;
+  telephone: string;
+  telephone2: string;
+  gouvernorat: string;
+  adresse: string;
+  produit: string;
+  prix_produit: number;
+  frais_livraison: number;
+  total_commande: number;
+  nombre_articles: number;
+  notes: string;
+  tracking_number: string;
+  statut: OrderStatus;
+  statut_avant_corbeille: string | null;
+  trashed_at: string | null;
+  date: string;
   created_at: string;
-  updated_at: string;
 }
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  imageBase64?: string;
+  imageMimeType?: string;
+  product?: any;
+  products?: any[];
+  order?: any;
 }
 
 export interface TrackingConfig {
-  facebook_pixel_id?: string;
-  ga4_id?: string;
-  welcome_message?: string;
+  facebookPixelIds: string[];
+  googleAnalyticsIds: string[];
+  welcomeMessage: string;
 }

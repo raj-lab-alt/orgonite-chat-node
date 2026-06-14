@@ -76,7 +76,8 @@ servicesRouter.post("/", requireAdmin, async (req: Request, res: Response) => {
         service_id: body.id,
         product_id: pid,
       }));
-      try { await supabase.from("service_products").insert(links); } catch {}
+      const { error: linkErr } = await supabase.from("service_products").insert(links);
+      if (linkErr) return res.status(500).json({ error: linkErr.message });
     }
 
     res.json({ success: true, id: body.id });
@@ -132,13 +133,15 @@ servicesRouter.put("/:id", requireAdmin, async (req: Request, res: Response) => 
 
     // Update linked products
     if (body.productIds && Array.isArray(body.productIds)) {
-      await supabase.from("service_products").delete().eq("service_id", req.params.id);
+      const { error: delErr } = await supabase.from("service_products").delete().eq("service_id", req.params.id);
+      if (delErr) return res.status(500).json({ error: delErr.message });
       if (body.productIds.length > 0) {
         const links = body.productIds.map((pid: string) => ({
           service_id: req.params.id,
           product_id: pid,
         }));
-        try { await supabase.from("service_products").insert(links); } catch {}
+        const { error: insErr } = await supabase.from("service_products").insert(links);
+        if (insErr) return res.status(500).json({ error: insErr.message });
       }
     }
 

@@ -23,6 +23,13 @@ export function isAdminToken(token: string) {
   return timingSafeEqual(Buffer.from(token), Buffer.from(expected));
 }
 
+export function verifyAdminPassword(password: string) {
+  const configured = adminPassword();
+  if (!configured) return false;
+  const hash = (pw: string) => createHash("sha256").update(pw).digest();
+  return timingSafeEqual(hash(password), hash(configured));
+}
+
 export function isSupabaseAdminUser(user: any) {
   const role = user?.app_metadata?.role || user?.user_metadata?.role;
   if (role === "admin") return true;

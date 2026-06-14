@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
-import { adminPassword, adminToken, isSupabaseAdminUser } from "../lib/admin-auth.js";
+import { adminPassword, adminToken, isSupabaseAdminUser, verifyAdminPassword } from "../lib/admin-auth.js";
 import { getAppConfig, maskApiKeys, updateAppConfig } from "../lib/app-config.js";
 
 export const adminRouter = Router();
@@ -49,7 +49,7 @@ adminRouter.post("/login", async (req: Request, res: Response) => {
         return res.status(500).json({ error: "ADMIN_PASSWORD non configure" });
       }
 
-      if (password !== configuredPassword) {
+      if (!verifyAdminPassword(password)) {
         return res.status(401).json({ error: "Identifiants invalides" });
       }
       return res.json({ token: adminToken(), user: { role: "admin" } });
