@@ -1,6 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useAdminStore } from "@/stores/admin-store";
+import { useAdminWs } from "@/hooks/useAdminWs";
 import LoginPage from "./LoginPage";
 import DashboardPage from "./DashboardPage";
 import OrdersPage from "./OrdersPage";
@@ -21,6 +22,20 @@ export default function AdminPage() {
   const { isAuth, checking, checkAuth, logout } = useAdminStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const [newOrderCount, setNewOrderCount] = useState(0);
+
+  const [toast, setToast] = useState<{ id: number; nom: string; produit?: string } | null>(null);
+  const toastIdRef = useRef(0);
+
+  useAdminWs((ev) => {
+    if (ev.event === "new_order") {
+      const data = ev.data as any;
+      setNewOrderCount((c) => c + 1);
+      const id = ++toastIdRef.current;
+      setToast({ id, nom: data?.nom || "Commande", produit: data?.produit });
+      setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 4000);
+    }
+  });
 
   useEffect(() => {
     checkAuth();
@@ -63,7 +78,10 @@ export default function AdminPage() {
           {NAV_ITEMS.map((item) => (
             <button
               key={item.path}
-              onClick={() => navigate(item.path)}
+              onClick={() => {
+                if (item.path === "/admin/orders") setNewOrderCount(0);
+                navigate(item.path);
+              }}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-left transition-colors ${
                 isActive(item.path)
                   ? "bg-primary/10 text-primary font-medium"
@@ -71,7 +89,12 @@ export default function AdminPage() {
               }`}
             >
               <span>{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
+              {item.path === "/admin/orders" && newOrderCount > 0 && (
+                <span className="bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                  {newOrderCount > 99 ? "99+" : newOrderCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -93,13 +116,17 @@ export default function AdminPage() {
         </div>
         <div className="flex-1 text-sm font-semibold">Orgonite Admin</div>
         <select
-          onChange={(e) => navigate(e.target.value)}
+          onChange={(e) => {
+            if (e.target.value === "/admin/orders") setNewOrderCount(0);
+            navigate(e.target.value);
+          }}
           value={location.pathname}
           className="text-sm border rounded px-2 py-1"
         >
           {NAV_ITEMS.map((item) => (
             <option key={item.path} value={item.path}>
               {item.icon} {item.label}
+              {item.path === "/admin/orders" && newOrderCount > 0 ? ` (${newOrderCount})` : ""}
             </option>
           ))}
         </select>
@@ -121,6 +148,22 @@ export default function AdminPage() {
           </Routes>
         </div>
       </main>
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-[100] animate-in slide-in-from-right-4 fade-in max-w-sm bg-primary text-primary-foreground rounded-lg shadow-lg p-4 flex items-start gap-3">
+          <span className="text-lg mt-0.5">📦</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate">{toast.nom}</p>
+            {toast.produit && <p className="text-xs opacity-80 truncate">{toast.produit}</p>}
+          </div>
+          <button
+            onClick={() => { setToast(null); navigate("/admin/orders"); setNewOrderCount(0); }}
+            className="shrink-0 text-xs underline underline-offset-2 hover:no-underline"
+          >
+            Voir
+          </button>
+        </div>
+      )}
     </div>
   );
 }
