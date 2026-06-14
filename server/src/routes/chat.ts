@@ -426,61 +426,16 @@ chatRouter.get("/diag", async (_req: Request, res: Response) => {
 });
 
 // POST /api/chat — text + optional image
-chatRouter.post("/", async (req: Request, res: Response) => {
+chatRouter.post("/", (req: Request, res: Response) => {
   try {
-    // test: just echo
-    try { res.json({ ok: true, received: req.body?.message }); return; } catch {}
-
-    // (original code below)
-    await checkRateLimit(req.ip);
-    const body = z.object({
-      message: z.string().max(2000).default(""),
-      imageBase64: z.string().nullable().optional(),
-      imageMimeType: z.string().nullable().optional(),
-      productId: z.string().nullable().optional(),
-      productType: z.string().default("general"),
-      conversationMode: z.string().default(""),
-      history: z.array(z.any()).default([]),
-      renderedProductIds: z.array(z.string()).default([]),
-      orderConfirmed: z.boolean().default(false),
-      stream: z.boolean().optional(),
-    }).refine((value) => value.message.trim().length > 0 || Boolean(value.imageBase64), {
-      message: "message ou image requis",
-      path: ["message"],
-    }).parse(req.body);
-
-    let message = body.message;
-    if (body.orderConfirmed) {
-      message = `[INSTRUCTION]Le prospect a deja confirme sa commande via la modale. NE PAS demander de confirmation ni re-presenter l'outil. Suivre le Closing normal etape par etape (nom → gouvernorat → adresse → telephone → disponibilite). Une fois la commande creee avec <ORDER>, AVANT d'envoyer le message de confirmation finale, proposer OBLIGATOIREMENT l'upsell livraison offerte des 2 outils. Ne pas sauter l'upsell.[/INSTRUCTION] ${message}`;
-    }
-
-    const extraFields = {
-      imageBase64: body.imageBase64 || null,
-      imageMimeType: body.imageMimeType || null,
-      audioBase64: null,
-      audioMimeType: null,
-    };
-
-    const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
-    if (wantsStream) {
-      await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
-      return;
-    }
-
-    const result = await generateChatResult(
-      message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds
-    );
-    await recordConversationStats(req, body.conversationMode, result);
-    res.json(result);
+    console.log("[POST /api/chat] handler called, body:", JSON.stringify(req.body));
+    const msg = req.body?.message || "";
+    res.json({ ok: true, echo: msg });
+    console.log("[POST /api/chat] res.json sent ok");
   } catch (err: any) {
-    if (err instanceof z.ZodError) {
-      return res.status(400).json({
-        error: err.errors.map((issue) => issue.message).join(", "),
-      });
-    }
-    logger.error("Chat error", { error: (err instanceof Error ? err.message : String(err)) });
+    console.error("[POST /api/chat] catch block:", err?.message || String(err));
     if (!res.headersSent) {
-      res.status(500).json({ error: "Erreur interne du serveur" });
+      res.status(500).json({ error: "ECHO FAILED", detail: err?.message || String(err) });
     }
   }
 });

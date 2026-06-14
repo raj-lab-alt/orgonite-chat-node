@@ -140,5 +140,11 @@ function shutdown(signal) {
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("unhandledRejection", (reason) => {
+    logger_js_1.logger.error("UNHANDLED REJECTION", { reason: reason instanceof Error ? reason.message : String(reason), stack: reason instanceof Error ? reason.stack : undefined });
+});
+process.on("uncaughtException", (err) => {
+    logger_js_1.logger.error("UNCAUGHT EXCEPTION", { error: err.message, stack: err.stack });
+});
 exports.default = app;
 //# sourceMappingURL=index.js.map
