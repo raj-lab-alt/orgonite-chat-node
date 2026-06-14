@@ -1396,6 +1396,7 @@ function injectCodProductStyles() {
       display: flex; gap: 12px; padding: 10px;
       width: 100%; max-width: 360px;
       align-self: flex-start;
+      align-items: flex-start;
       margin: 4px 0 14px;
       border-radius: 14px;
       background: rgba(18, 18, 32, 0.96);
@@ -1416,7 +1417,6 @@ function injectCodProductStyles() {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column;
       justify-content: center;
-      overflow: hidden;
       word-break: break-word;
     }
     .chat-product-title {
