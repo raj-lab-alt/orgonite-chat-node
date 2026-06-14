@@ -59,9 +59,19 @@ export default {
           "0%": { opacity: "0", transform: "translateY(8px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        avatarSpin: {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
+        statusPulse: {
+          "0%, 100%": { boxShadow: "0 0 6px rgba(34, 197, 94, 0.4)" },
+          "50%": { boxShadow: "0 0 14px rgba(34, 197, 94, 0.8), 0 0 25px rgba(34, 197, 94, 0.2)" },
+        },
       },
       animation: {
         "card-in": "cardIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)",
+        "avatar-spin": "avatarSpin 4s linear infinite",
+        "status-pulse": "statusPulse 2.5s ease-in-out infinite",
       },
     },
   },

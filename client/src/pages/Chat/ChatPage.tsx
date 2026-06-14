@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useChatStore } from "@/stores/chat-store";
 import { ChatMessageBubble } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
@@ -31,11 +32,18 @@ export default function ChatPage() {
     clearStream, setOrderConfirmed,
   } = useChatStore();
 
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const view = searchParams.get("view") || "chat";
+  const slug = searchParams.get("slug") || "";
+
   const [showAudio, setShowAudio] = useState(false);
   const [welcomeMsg, setWelcomeMsg] = useState("");
   const [welcomeProduct, setWelcomeProduct] = useState<any>(null);
   const [welcomeDone, setWelcomeDone] = useState(false);
   const [error, setError] = useState("");
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [allServices, setAllServices] = useState<any[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const welcomeShown = useRef(false);
@@ -49,10 +57,12 @@ export default function ChatPage() {
     });
     if (productId) {
       fetchProducts().then((products) => {
+        setAllProducts(products);
         const p = products.find((p: any) => p.id === productId || p.slug === productId);
         if (p) setWelcomeProduct(p);
       });
     }
+    fetchProducts().then(setAllProducts);
   }, [productId]);
 
   useEffect(() => {
@@ -221,66 +231,164 @@ export default function ChatPage() {
     [mode, productId, productType, history, addMessage, setStreaming, appendStream, clearStream]
   );
 
+  const showPageView = view === "product" || view === "service";
+
   return (
     <div className="flex flex-col h-dvh bg-background">
+      {/* SPA Navigation */}
+      <nav className={`shrink-0 bg-background border-b border-primary/10 px-4 py-3 flex items-center gap-3 ${showPageView ? "" : "hidden"}`}>
+        <button
+          onClick={() => navigate("/")}
+          className="bg-muted border border-primary/15 text-foreground px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 hover:bg-muted/80 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Retour
+        </button>
+        <span className="text-sm font-semibold text-foreground truncate">
+          {view === "product" ? (welcomeProduct?.name || "Produit") : view === "service" ? "Services" : ""}
+        </span>
+      </nav>
+
       {/* Header */}
-      <header className="border-b px-4 py-3 flex items-center gap-2 shrink-0">
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-          O
+      <header className="shrink-0 bg-background/92 border-b border-primary/10 px-4 py-3 flex items-center gap-3">
+        <div className="relative shrink-0" style={{ width: 44, height: 44 }}>
+          <div className="absolute inset-[-3px] rounded-full" style={{
+            background: "conic-gradient(from 0deg, rgba(140,110,255,0.5), rgba(99,102,241,0.15), rgba(180,140,255,0.4), rgba(140,110,255,0.5))",
+            animation: "avatarSpin 4s linear infinite",
+            WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))",
+            mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))",
+          }} />
+          <img
+            src="/amine-avatar.webp"
+            alt="Amine"
+            className="w-11 h-11 rounded-full object-cover relative"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-background animate-status-pulse" />
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-semibold truncate">Orgonite Tunisie</h1>
-          <p className="text-xs text-muted-foreground">
-            Mode {mode}
-            {productId && ` · ${productId.replace(/_/g, " ")}`}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-sm font-semibold text-foreground truncate">Amine</h1>
+            <svg className="w-3.5 h-3.5 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="currentColor" style={{ filter: "drop-shadow(0 0 6px rgba(59,130,246,0.6))" }}>
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+          </div>
+          <p className="text-[11px] font-medium text-muted-foreground/60 tracking-wider uppercase">Conseiller Énergétique</p>
         </div>
       </header>
 
-      {/* Messages */}
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-        {messages.length === 0 && !welcomeMsg && (
-          <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center text-white text-2xl mb-4">
-              O
+      {/* Trust Bar */}
+      <div className="shrink-0 flex justify-center items-center gap-3 px-2.5 py-1.5 bg-background/70 border-b border-primary/5 flex-wrap text-center">
+        <span className="text-[10.5px] text-muted-foreground/70">⭐⭐⭐⭐⭐ 4.9/5 — 1 247 avis vérifiés</span>
+        <span className="text-[10.5px] text-muted-foreground/70">🇹🇳 Livraison dans toute la Tunisie</span>
+        <span className="text-[10.5px] text-muted-foreground/70">💳 Paiement à la livraison</span>
+      </div>
+
+      {/* Page View (product details, services) */}
+      {showPageView && (
+        <div className="flex-1 overflow-y-auto">
+          {view === "product" && (
+            <div className="p-4">
+              {welcomeProduct ? (
+                <div className="bg-card border border-primary/10 rounded-2xl overflow-hidden product-card">
+                  {(welcomeProduct.imageUrl || welcomeProduct.image_url) && (
+                    <img
+                      src={welcomeProduct.imageUrl || welcomeProduct.image_url}
+                      alt={welcomeProduct.name || "Produit"}
+                      className="w-full h-48 object-cover"
+                    />
+                  )}
+                  <div className="p-4">
+                    <h2 className="text-lg font-bold text-foreground">{welcomeProduct.name || "Produit"}</h2>
+                    {(welcomeProduct.price || welcomeProduct.prix) && (
+                      <p className="text-xl font-bold text-primary mt-1">
+                        {welcomeProduct.price || welcomeProduct.prix} {welcomeProduct.currency || "DT"}
+                      </p>
+                    )}
+                    {welcomeProduct.description && (
+                      <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{welcomeProduct.description}</p>
+                    )}
+                    <button
+                      onClick={() => navigate("/")}
+                      className="w-full mt-4 bg-primary text-primary-foreground rounded-xl py-3 font-semibold text-sm hover:bg-primary/90 transition-colors"
+                    >
+                      Discuter de ce produit
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Chargement...</div>
+              )}
             </div>
-            <p className="text-sm max-w-xs">
-              Bienvenue ! Je suis Amine, votre conseiller Orgonite Tunisie.
-              Comment puis-je vous aider aujourd'hui ?
-            </p>
-          </div>
-        )}
+          )}
+          {view === "service" && (
+            <div className="p-4">
+              <p className="text-sm text-muted-foreground">Page service à configurer</p>
+            </div>
+          )}
+        </div>
+      )}
 
-        {messages.map((msg) => (
-          <ChatMessageBubble
-            key={msg.id}
-            role={msg.role}
-            content={msg.content}
-            trustedHtml={msg.trustedHtml}
-            imageBase64={msg.imageBase64}
-            imageMimeType={msg.imageMimeType}
-            product={msg.product}
-            products={msg.products}
-            order={msg.order}
-            onOrderProduct={handleOrderProduct}
-          />
-        ))}
+      {/* Messages */}
+      {!showPageView && (
+        <main className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+          {messages.length === 0 && !welcomeMsg && (
+            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+              <div className="relative mb-4" style={{ width: 64, height: 64 }}>
+                <div className="absolute inset-[-4px] rounded-full" style={{
+                  background: "conic-gradient(from 0deg, rgba(140,110,255,0.5), rgba(99,102,241,0.15), rgba(180,140,255,0.4), rgba(140,110,255,0.5))",
+                  animation: "avatarSpin 4s linear infinite",
+                  WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))",
+                  mask: "radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1px))",
+                }} />
+                <img
+                  src="/amine-avatar.webp"
+                  alt="Amine"
+                  className="w-16 h-16 rounded-full object-cover relative"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+              <p className="text-sm max-w-xs text-muted-foreground">
+                Bienvenue ! Je suis Amine, votre conseiller Orgonite Tunisie.
+                Comment puis-je vous aider aujourd'hui ?
+              </p>
+            </div>
+          )}
 
-        {isStreaming && streamingContent && (
-          <ChatMessageBubble
-            role="assistant"
-            content={streamingContent}
-            isStreaming
-            onOrderProduct={handleOrderProduct}
-          />
-        )}
+          {messages.map((msg) => (
+            <ChatMessageBubble
+              key={msg.id}
+              role={msg.role}
+              content={msg.content}
+              trustedHtml={msg.trustedHtml}
+              imageBase64={msg.imageBase64}
+              imageMimeType={msg.imageMimeType}
+              product={msg.product}
+              products={msg.products}
+              order={msg.order}
+              onOrderProduct={handleOrderProduct}
+            />
+          ))}
 
-        {error && (
-          <div className="text-center text-destructive text-xs py-2">{error}</div>
-        )}
+          {isStreaming && streamingContent && (
+            <ChatMessageBubble
+              role="assistant"
+              content={streamingContent}
+              isStreaming
+              onOrderProduct={handleOrderProduct}
+            />
+          )}
 
-        <div ref={endRef} />
-      </main>
+          {error && (
+            <div className="text-center text-destructive text-xs py-2">{error}</div>
+          )}
+
+          <div ref={endRef} />
+        </main>
+      )}
 
       {/* Audio recorder */}
       {showAudio && (
@@ -291,11 +399,13 @@ export default function ChatPage() {
       )}
 
       {/* Input */}
-      <ChatInput
-        onSend={handleSend}
-        onStartVoice={() => setShowAudio(true)}
-        isStreaming={isStreaming}
-      />
+      {!showPageView && (
+        <ChatInput
+          onSend={handleSend}
+          onStartVoice={() => setShowAudio(true)}
+          isStreaming={isStreaming}
+        />
+      )}
     </div>
   );
 }

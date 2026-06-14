@@ -67,6 +67,23 @@
     50% { transform: translate(18px, -12px); }
     100% { transform: translate(0, 0); }
   }
+
+  @keyframes bubbleInLeft {
+    from { opacity: 0; transform: translateX(-24px) scale(0.96); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  @keyframes bubbleInRight {
+    from { opacity: 0; transform: translateX(24px) scale(0.96); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  @keyframes cardSlideIn {
+    from { opacity: 0; transform: translateY(18px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .bubble-amine { animation: bubbleInLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+  .bubble-user { animation: bubbleInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+  .product-card { animation: cardSlideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
 }
 
 @layer base {

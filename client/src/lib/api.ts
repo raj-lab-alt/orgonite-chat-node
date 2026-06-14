@@ -65,6 +65,30 @@ export async function sendMessage({
   onError,
   signal,
 }: SendMessageParams) {
+  const body = {
+    message,
+    imageBase64,
+    imageMimeType,
+    productId,
+    productType,
+    conversationMode,
+    history,
+    renderedProductIds,
+    orderConfirmed,
+  };
+
+  // Try SSE first; fall back to JSON if timeout
+  await trySSE(body, onChunk, onDone, onError, signal) ||
+    tryJSON(body, onDone, onError, signal);
+}
+
+async function trySSE(
+  body: Record<string, any>,
+  onChunk: (text: string) => void,
+  onDone: (data: any) => void,
+  onError: (err: string) => void,
+  signal?: AbortSignal,
+): Promise<boolean> {
   try {
     const res = await fetch(`${BASE}/api/chat`, {
       method: "POST",
@@ -73,46 +97,34 @@ export async function sendMessage({
         Accept: "text/event-stream",
         "X-Session-Key": getSessionKey(),
       },
-      body: JSON.stringify({
-        message,
-        imageBase64,
-        imageMimeType,
-        productId,
-        productType,
-        conversationMode,
-        history,
-        renderedProductIds,
-        orderConfirmed,
-        stream: true,
-      }),
+      body: JSON.stringify({ ...body, stream: true }),
       signal,
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "Erreur serveur" }));
-      onError(err.error || `HTTP ${res.status}`);
-      return;
+      if (res.status !== 429) onError(err.error || `HTTP ${res.status}`);
+      return false;
     }
 
     const reader = res.body?.getReader();
-    if (!reader) {
-      onError("Pas de flux disponible");
-      return;
-    }
+    if (!reader) return false;
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let gotData = false;
     let sseTimeout: ReturnType<typeof setTimeout> | undefined;
 
     const clearSseTimeout = () => { if (sseTimeout !== undefined) { clearTimeout(sseTimeout); sseTimeout = undefined; } };
-    const resetSseTimeout = () => {
+    const fail = () => {
       clearSseTimeout();
-      sseTimeout = setTimeout(() => {
-        onError("Le serveur ne répond pas");
-        reader.cancel();
-      }, 30000);
+      reader.cancel();
     };
-    resetSseTimeout();
+
+    sseTimeout = setTimeout(() => {
+      if (!gotData) { fail(); return; }
+      clearSseTimeout();
+    }, 12000);
 
     while (true) {
       const { done, value } = await reader.read();
@@ -129,6 +141,7 @@ export async function sendMessage({
 
         try {
           const data = JSON.parse(jsonStr);
+          gotData = true;
 
           if (data.done) {
             clearSseTimeout();
@@ -139,18 +152,54 @@ export async function sendMessage({
               products: data.products,
             });
           } else if (data.text) {
-            resetSseTimeout();
             onChunk(data.text);
           }
-        } catch {
-          // skip malformed
-        }
+        } catch {}
       }
     }
     clearSseTimeout();
+    return true;
   } catch (err: any) {
-    if (err.name === "AbortError") return;
+    if (err.name === "AbortError") return false;
+    return false;
+  }
+}
+
+async function tryJSON(
+  body: Record<string, any>,
+  onDone: (data: any) => void,
+  onError: (err: string) => void,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE}/api/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-Key": getSessionKey(),
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Erreur serveur" }));
+      onError(err.error || `HTTP ${res.status}`);
+      return false;
+    }
+
+    const data = await res.json();
+    onDone({
+      reply: data.reply || "",
+      order: data.order,
+      product: data.product,
+      products: data.products,
+    });
+    return true;
+  } catch (err: any) {
+    if (err.name === "AbortError") return false;
     onError(err.message || "Erreur de connexion");
+    return false;
   }
 }
 
