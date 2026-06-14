@@ -70,6 +70,7 @@ export default function ChatPage({ showProductHero = false, product: propProduct
   }, [productId]);
 
   useEffect(() => {
+    if (showProductHero) return;
     if (welcomeDone && !welcomeShown.current && messages.length === 0) {
       welcomeShown.current = true;
       addMessage({
@@ -81,7 +82,7 @@ export default function ChatPage({ showProductHero = false, product: propProduct
         trustedHtml: true,
       });
     }
-  }, [welcomeDone, welcomeProduct]);
+  }, [welcomeDone, welcomeProduct, showProductHero]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -366,7 +367,7 @@ export default function ChatPage({ showProductHero = false, product: propProduct
       {/* Messages */}
       {(!showPageView || showProductHero) && (
         <main className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-          {messages.length === 0 && !welcomeMsg && (
+          {messages.length === 0 && !welcomeMsg && !showProductHero && (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
               <div className="w-[68px] h-[68px] rounded-full p-[3px] mb-4" style={{
                 background: "conic-gradient(from 0deg, rgba(140,110,255,0.5), rgba(99,102,241,0.15), rgba(180,140,255,0.4), rgba(140,110,255,0.5))",
