@@ -154,4 +154,7 @@ process.on("uncaughtException", (err) => {
   logger.error("UNCAUGHT EXCEPTION", { error: err.message, stack: err.stack });
 });
 
+// For dev: let process managers know the app is ready
+logger.info("App initialized");
+
 export default app;

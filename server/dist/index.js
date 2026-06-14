@@ -146,5 +146,7 @@ process.on("unhandledRejection", (reason) => {
 process.on("uncaughtException", (err) => {
     logger_js_1.logger.error("UNCAUGHT EXCEPTION", { error: err.message, stack: err.stack });
 });
+// For dev: let process managers know the app is ready
+logger_js_1.logger.info("App initialized");
 exports.default = app;
 //# sourceMappingURL=index.js.map
