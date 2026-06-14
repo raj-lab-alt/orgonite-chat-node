@@ -259,6 +259,7 @@ async function generateChatResult(message, extraFields, history, productId, conv
     return { reply: cleanFinalReply, order: savedOrder, product: productData, products: productList };
 }
 async function handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed = false, renderedProductIds = []) {
+    logger_js_1.logger.info("SSE: start", { msgLen: message.length });
     try {
         if (!res.headersSent) {
             res.writeHead(200, {
@@ -266,10 +267,12 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
                 "Cache-Control": "no-cache, no-transform",
                 Connection: "keep-alive",
                 "X-Accel-Buffering": "no",
+                "X-Passenger-Buffering": "no",
             });
         }
     }
     catch {
+        logger_js_1.logger.error("SSE: writeHead failed");
         if (!res.writableEnded) {
             try {
                 res.end();
@@ -278,6 +281,7 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
         }
         return;
     }
+    logger_js_1.logger.info("SSE: headers sent");
     const reqAborted = () => req.destroyed;
     let apiKeys, models, products, statuses, dbSystemPrompt, catalogItemTemplate;
     let catalog;
@@ -294,7 +298,7 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
         systemPrompt = (0, prompt_js_1.getSystemPrompt)(catalog, dbSystemPrompt, catalogItemTemplate, productType);
     }
     catch (err) {
-        logger_js_1.logger.error("handleChatSSE config error", { error: err.message });
+        logger_js_1.logger.error("SSE: config error", { error: err.message });
         if (!res.writableEnded) {
             try {
                 res.write(`data: ${JSON.stringify({ error: "Erreur de configuration" })}\n\n`);
@@ -304,24 +308,39 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
         }
         return;
     }
-    // Phase 1: stream Gemini tokens immediately
+    logger_js_1.logger.info("SSE: config loaded", { keyCount: apiKeys?.length, modelCount: models?.length });
+    // Phase 1: stream Gemini tokens
     let fullReply = "";
     try {
+        logger_js_1.logger.info("SSE: starting Gemini stream");
         const stream = (0, gemini_js_1.chatGeminiRequestStream)(message, extraFields, history, productId, conversationMode, isVoice, productType, systemPrompt, apiKeys, models);
         for await (const chunk of stream) {
             if (reqAborted()) {
-                res.end();
+                logger_js_1.logger.info("SSE: client aborted during stream");
+                try {
+                    res.end();
+                }
+                catch { }
                 return;
             }
             fullReply += chunk;
-            res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+            try {
+                res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+            }
+            catch {
+                logger_js_1.logger.warn("SSE: write chunk failed");
+            }
         }
+        logger_js_1.logger.info("SSE: Gemini stream done", { replyLen: fullReply.length });
     }
     catch (err) {
-        logger_js_1.logger.error("Gemini chat error", { error: err.message });
+        logger_js_1.logger.error("SSE: Gemini error", { error: err.message });
         if (!fullReply) {
             fullReply = "Desole, une erreur est survenue. Veuillez reessayer.";
-            res.write(`data: ${JSON.stringify({ text: fullReply })}\n\n`);
+            try {
+                res.write(`data: ${JSON.stringify({ text: fullReply })}\n\n`);
+            }
+            catch { }
         }
     }
     // Phase 2: process order + products
@@ -377,7 +396,7 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
         replyForClient = toClientReply(reply, productList);
     }
     catch (err) {
-        logger_js_1.logger.error("handleChatSSE phase2 error", { error: err.message });
+        logger_js_1.logger.error("SSE: phase2 error", { error: err.message });
     }
     const result = { reply: replyForClient || fullReply, order: savedOrder, product: productData, products: productList };
     try {
@@ -385,11 +404,19 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
     }
     catch { /* stats are best-effort */ }
     try {
+        logger_js_1.logger.info("SSE: sending done event");
         res.write(`data: ${JSON.stringify({ done: true, reply: result.reply, order: result.order, product: result.product, products: result.products })}\n\n`);
         res.write("data: [DONE]\n\n");
         res.end();
+        logger_js_1.logger.info("SSE: done");
     }
-    catch { /* client may have disconnected */ }
+    catch {
+        logger_js_1.logger.warn("SSE: final write failed (client disconnected)");
+        try {
+            res.end();
+        }
+        catch { }
+    }
 }
 // GET /api/chat/diag — diagnostic endpoint
 exports.chatRouter.get("/diag", async (_req, res) => {
@@ -461,6 +488,31 @@ exports.chatRouter.post("/echo", (req, res) => {
                 res.status(500).json({ error: e.message });
         }
     }, 0);
+});
+// GET /api/chat/test-sse — full SSE diagnostic
+exports.chatRouter.get("/test-sse", (_req, res) => {
+    res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+        "X-Passenger-Buffering": "no",
+    });
+    const send = (data) => {
+        try {
+            res.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+        catch { }
+    };
+    send({ step: 1, msg: "SSE headers sent" });
+    send({ step: 2, msg: "Phase 2 — checking write capability" });
+    send({ step: 3, msg: "Phase 3 — done event" });
+    send({ done: true, reply: "Test SSE OK", testTs: Date.now() });
+    send({ done: true, msg: "[DONE]" });
+    try {
+        res.end();
+    }
+    catch { }
 });
 // POST /api/chat — text + optional image
 exports.chatRouter.post("/", (req, res) => {

@@ -284,6 +284,7 @@ async function handleChatSSE(
   orderConfirmed = false,
   renderedProductIds: string[] = [],
 ) {
+  logger.info("SSE: start", { msgLen: message.length });
   try {
     if (!res.headersSent) {
       res.writeHead(200, {
@@ -291,12 +292,15 @@ async function handleChatSSE(
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
+        "X-Passenger-Buffering": "no",
       });
     }
   } catch {
+    logger.error("SSE: writeHead failed");
     if (!res.writableEnded) { try { res.end(); } catch {} }
     return;
   }
+  logger.info("SSE: headers sent");
 
   const reqAborted = () => req.destroyed;
 
@@ -315,32 +319,39 @@ async function handleChatSSE(
     catalog = catalogProducts(products);
     systemPrompt = getSystemPrompt(catalog, dbSystemPrompt, catalogItemTemplate, productType);
   } catch (err: any) {
-    logger.error("handleChatSSE config error", { error: err.message });
+    logger.error("SSE: config error", { error: err.message });
     if (!res.writableEnded) {
       try { res.write(`data: ${JSON.stringify({ error: "Erreur de configuration" })}\n\n`); } catch {}
       res.end();
     }
     return;
   }
+  logger.info("SSE: config loaded", { keyCount: apiKeys?.length, modelCount: models?.length });
 
-  // Phase 1: stream Gemini tokens immediately
+  // Phase 1: stream Gemini tokens
   let fullReply = "";
   try {
+    logger.info("SSE: starting Gemini stream");
     const stream = chatGeminiRequestStream(
       message, extraFields, history, productId, conversationMode,
       isVoice, productType, systemPrompt, apiKeys, models
     );
 
     for await (const chunk of stream) {
-      if (reqAborted()) { res.end(); return; }
+      if (reqAborted()) {
+        logger.info("SSE: client aborted during stream");
+        try { res.end(); } catch {}
+        return;
+      }
       fullReply += chunk;
-      res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+      try { res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`); } catch { logger.warn("SSE: write chunk failed"); }
     }
+    logger.info("SSE: Gemini stream done", { replyLen: fullReply.length });
   } catch (err: any) {
-    logger.error("Gemini chat error", { error: err.message });
+    logger.error("SSE: Gemini error", { error: err.message });
     if (!fullReply) {
       fullReply = "Desole, une erreur est survenue. Veuillez reessayer.";
-      res.write(`data: ${JSON.stringify({ text: fullReply })}\n\n`);
+      try { res.write(`data: ${JSON.stringify({ text: fullReply })}\n\n`); } catch {}
     }
   }
 
@@ -403,7 +414,7 @@ async function handleChatSSE(
 
     replyForClient = toClientReply(reply, productList);
   } catch (err: any) {
-    logger.error("handleChatSSE phase2 error", { error: err.message });
+    logger.error("SSE: phase2 error", { error: err.message });
   }
 
   const result: ChatResult = { reply: replyForClient || fullReply, order: savedOrder, product: productData, products: productList };
@@ -411,10 +422,15 @@ async function handleChatSSE(
     await recordConversationStats(req, conversationMode, result);
   } catch { /* stats are best-effort */ }
   try {
+    logger.info("SSE: sending done event");
     res.write(`data: ${JSON.stringify({ done: true, reply: result.reply, order: result.order, product: result.product, products: result.products })}\n\n`);
     res.write("data: [DONE]\n\n");
     res.end();
-  } catch { /* client may have disconnected */ }
+    logger.info("SSE: done");
+  } catch {
+    logger.warn("SSE: final write failed (client disconnected)");
+    try { res.end(); } catch {}
+  }
 }
 
 // GET /api/chat/diag — diagnostic endpoint
@@ -491,6 +507,26 @@ chatRouter.post("/echo", (req: Request, res: Response) => {
       if (!res.headersSent) res.status(500).json({ error: e.message });
     }
   }, 0);
+});
+
+// GET /api/chat/test-sse — full SSE diagnostic
+chatRouter.get("/test-sse", (_req: Request, res: Response) => {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+    "X-Passenger-Buffering": "no",
+  });
+  const send = (data: any) => {
+    try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch {}
+  };
+  send({ step: 1, msg: "SSE headers sent" });
+  send({ step: 2, msg: "Phase 2 — checking write capability" });
+  send({ step: 3, msg: "Phase 3 — done event" });
+  send({ done: true, reply: "Test SSE OK", testTs: Date.now() });
+  send({ done: true, msg: "[DONE]" });
+  try { res.end(); } catch {}
 });
 
 // POST /api/chat — text + optional image

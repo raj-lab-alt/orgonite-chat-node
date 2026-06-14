@@ -102,6 +102,17 @@ export async function sendMessage({
 
     const decoder = new TextDecoder();
     let buffer = "";
+    let sseTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    const clearSseTimeout = () => { if (sseTimeout !== undefined) { clearTimeout(sseTimeout); sseTimeout = undefined; } };
+    const resetSseTimeout = () => {
+      clearSseTimeout();
+      sseTimeout = setTimeout(() => {
+        onError("Le serveur ne répond pas");
+        reader.cancel();
+      }, 30000);
+    };
+    resetSseTimeout();
 
     while (true) {
       const { done, value } = await reader.read();
@@ -120,6 +131,7 @@ export async function sendMessage({
           const data = JSON.parse(jsonStr);
 
           if (data.done) {
+            clearSseTimeout();
             onDone({
               reply: data.reply || "",
               order: data.order,
@@ -127,6 +139,7 @@ export async function sendMessage({
               products: data.products,
             });
           } else if (data.text) {
+            resetSseTimeout();
             onChunk(data.text);
           }
         } catch {
@@ -134,6 +147,7 @@ export async function sendMessage({
         }
       }
     }
+    clearSseTimeout();
   } catch (err: any) {
     if (err.name === "AbortError") return;
     onError(err.message || "Erreur de connexion");
