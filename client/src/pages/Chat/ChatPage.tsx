@@ -25,7 +25,11 @@ function collectRenderedProductIds(messages: ChatMessage[]) {
   return [...ids];
 }
 
-export default function ChatPage() {
+interface ChatPageProps {
+  showProductHero?: boolean;
+}
+
+export default function ChatPage({ showProductHero = false }: ChatPageProps) {
   const {
     messages, isStreaming, streamingContent, mode, productId, productType,
     orderConfirmed, history, addMessage, setStreaming, appendStream,
@@ -230,22 +234,24 @@ export default function ChatPage() {
     [mode, productId, productType, history, addMessage, setStreaming, appendStream, clearStream]
   );
 
-  const showPageView = view === "product" || view === "service";
+  const showPageView = !showProductHero && (view === "product" || view === "service");
 
   return (
     <div className="chat-container flex flex-col h-dvh bg-background">
       {/* SPA Navigation */}
-      <nav className={`shrink-0 bg-background border-b border-primary/10 px-4 py-3 flex items-center gap-3 ${showPageView ? "" : "hidden"}`}>
-        <button
-          onClick={() => navigate("/")}
-          className="bg-muted border border-primary/15 text-foreground px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 hover:bg-muted/80 transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Retour
-        </button>
-        <span className="text-sm font-semibold text-foreground truncate">
-          {view === "product" ? (welcomeProduct?.name || "Produit") : view === "service" ? "Services" : ""}
-        </span>
-      </nav>
+      {showPageView && (
+        <nav className="shrink-0 bg-background border-b border-primary/10 px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={() => navigate("/")}
+            className="bg-muted border border-primary/15 text-foreground px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 hover:bg-muted/80 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg> Retour
+          </button>
+          <span className="text-sm font-semibold text-foreground truncate">
+            {view === "product" ? (welcomeProduct?.name || "Produit") : view === "service" ? "Services" : ""}
+          </span>
+        </nav>
+      )}
 
       {/* Header */}
       <header className="shrink-0 bg-background/92 border-b border-primary/10 px-4 py-3 flex items-center gap-3 backdrop-blur-xl">
@@ -285,7 +291,33 @@ export default function ChatPage() {
         <span className="text-[10.5px] text-muted-foreground/70">💳 Paiement à la livraison</span>
       </div>
 
-      {/* Page View (product details, services) */}
+      {/* Product Hero (org route) */}
+      {showProductHero && welcomeProduct && (
+        <div className="shrink-0 border-b border-primary/10">
+          <div className="flex gap-4 p-4 items-start">
+            {(welcomeProduct.imageUrl || welcomeProduct.image_url) && (
+              <img
+                src={welcomeProduct.imageUrl || welcomeProduct.image_url}
+                alt={welcomeProduct.name || "Produit"}
+                className="w-24 h-24 rounded-xl object-cover shrink-0"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base font-bold text-foreground">{welcomeProduct.name || "Produit"}</h2>
+              {(welcomeProduct.price || welcomeProduct.prix) && (
+                <p className="text-lg font-bold text-primary mt-0.5">
+                  {welcomeProduct.price || welcomeProduct.prix} {welcomeProduct.currency || "DT"}
+                </p>
+              )}
+              {welcomeProduct.description && (
+                <p className="text-xs text-muted-foreground mt-1 leading-snug line-clamp-2">{welcomeProduct.description}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Page View (full-page product details, services) - only when not org route */}
       {showPageView && (
         <div className="flex-1 overflow-y-auto">
           {view === "product" && (
@@ -331,7 +363,7 @@ export default function ChatPage() {
       )}
 
       {/* Messages */}
-      {!showPageView && (
+      {(!showPageView || showProductHero) && (
         <main className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
           {messages.length === 0 && !welcomeMsg && (
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
@@ -398,7 +430,7 @@ export default function ChatPage() {
       )}
 
       {/* Input */}
-      {!showPageView && (
+      {(!showPageView || showProductHero) && (
         <ChatInput
           onSend={handleSend}
           onStartVoice={() => setShowAudio(true)}

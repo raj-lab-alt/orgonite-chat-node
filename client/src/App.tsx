@@ -6,6 +6,7 @@ import type { ProductType } from "@/stores/chat-store";
 import { fetchProducts } from "@/lib/api";
 import ChatPage from "@/pages/Chat/ChatPage";
 import AdminPage from "@/pages/Admin/AdminPage";
+import ProductPage from "@/pages/Chat/ProductPage";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function HomePage() {
@@ -51,6 +52,7 @@ export default function App() {
     <ErrorBoundary>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/orgonite/:slug" element={<ProductPage />} />
         <Route path="/admin/*" element={<AdminPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
