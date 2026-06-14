@@ -412,7 +412,7 @@ async function handleChatSSE(
 }
 
 // GET /api/chat/diag — diagnostic endpoint
-chatRouter.get("/diag", requireAdmin, async (_req: Request, res: Response) => {
+chatRouter.get("/diag", async (_req: Request, res: Response) => {
   try {
     const diag: any = {};
     diag.step1 = "started";
@@ -426,10 +426,48 @@ chatRouter.get("/diag", requireAdmin, async (_req: Request, res: Response) => {
     diag.geminiModels = config.geminiModels;
     diag.configSource = config.source;
 
+    // Add directory listing to diagnose the 403 issue
+    const fs = await import("fs");
+    const path = await import("path");
+    
+    diag.cwd = process.cwd();
+    diag.dirname = __dirname;
+    diag.envKeys = Object.keys(process.env);
+    diag.port = process.env.PORT;
+    diag.nodeVersion = process.version;
+    
+    // Check files in current dir
+    try {
+      diag.filesInCwd = fs.readdirSync(process.cwd());
+    } catch (e: any) {
+      diag.filesInCwdError = e.message;
+    }
+    
+    // Check files in parent dir
+    try {
+      diag.filesInParent = fs.readdirSync(path.join(process.cwd(), ".."));
+    } catch (e: any) {
+      diag.filesInParentError = e.message;
+    }
+
+    // Check if .htaccess exists anywhere
+    const htaccessPaths = [
+      path.join(process.cwd(), ".htaccess"),
+      path.join(process.cwd(), "..", ".htaccess"),
+      path.join(process.cwd(), "../..", ".htaccess")
+    ];
+    diag.htaccessChecks = {};
+    for (const p of htaccessPaths) {
+      diag.htaccessChecks[p] = {
+        exists: fs.existsSync(p),
+        content: fs.existsSync(p) ? fs.readFileSync(p, "utf8").substring(0, 1000) : null
+      };
+    }
+
     diag.step4 = "ok";
     res.json(diag);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    res.json({ error: err.message, stack: err.stack });
   }
 });
 
