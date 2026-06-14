@@ -1,6 +1,6 @@
 import { logger } from "../lib/logger.js";
 import { supabase } from "../lib/supabase.js";
-import { recordAttempt } from "./gemini-stats.js";
+import { recordAttempt, getModelStats } from "./gemini-stats.js";
 import { refreshModelList } from "./gemini-models.js";
 
 interface GeminiContent {
@@ -149,6 +149,56 @@ export class GeminiError extends Error {
 
 let globalKeyIndex = 0;
 let globalModelIndex = 0;
+let topModelIndex = 0;
+let topKeyIndex = 0;
+
+const MIN_SOLID_SAMPLES = 10;
+
+function getTopModels(models: string[]): string[] | null {
+  const stats = getModelStats();
+  const scored = stats.models
+    .filter(m => m.requests >= MIN_SOLID_SAMPLES)
+    .sort((a, b) => {
+      if (b.successRate !== a.successRate) return b.successRate - a.successRate;
+      if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+      return a.avgLatencyMs - b.avgLatencyMs;
+    })
+    .slice(0, 5)
+    .map(m => m.model)
+    .filter(m => models.includes(m));
+  return scored.length >= 1 ? scored : null;
+}
+
+function getTopKeys(apiKeysLength: number): number[] | null {
+  const stats = getModelStats();
+  const scored = stats.keys
+    .filter(k => k.requests >= MIN_SOLID_SAMPLES)
+    .sort((a, b) => {
+      if (b.successRate !== a.successRate) return b.successRate - a.successRate;
+      return a.avgLatencyMs - b.avgLatencyMs;
+    })
+    .slice(0, Math.min(apiKeysLength, 5))
+    .map(k => k.keyIndex);
+  return scored.length >= 1 ? scored : null;
+}
+
+function pickModel(models: string[]): string {
+  const topModels = getTopModels(models);
+  if (topModels) {
+    const idx = topModelIndex++ % topModels.length;
+    return topModels[idx];
+  }
+  return models[globalModelIndex++ % models.length];
+}
+
+function pickKeyIndex(apiKeysLength: number): number {
+  const topKeys = getTopKeys(apiKeysLength);
+  if (topKeys) {
+    const idx = topKeyIndex++ % topKeys.length;
+    return topKeys[idx];
+  }
+  return globalKeyIndex++ % apiKeysLength;
+}
 
 export async function* chatGeminiRequestStream(
   message: string,
@@ -205,33 +255,42 @@ export async function* chatGeminiRequestStream(
 
   const contents = buildContents(messages);
 
-  // Sequential retry across models with key rotation per attempt
-  // One request per message to avoid rate limiting
+  // Sequential retry — try best model+key combos first (by stats), fallback round-robin
   let lastError: unknown;
-  let triedModels = 0;
   for (let attempt = 0; attempt < models.length; attempt++) {
-    const modelIndex = globalModelIndex++ % models.length;
-    const model = models[modelIndex];
-    const keyIndex = globalKeyIndex++ % apiKeys.length;
+    const model = pickModel(models);
+    const keyIndex = pickKeyIndex(apiKeys.length);
     const apiKey = apiKeys[keyIndex];
-    triedModels++;
 
     const startTime = Date.now();
+    let recorded = false;
     try {
       for await (const chunk of callGeminiStream(apiKey, model, contents, systemPrompt)) {
+        if (!recorded) {
+          recorded = true;
+          recordAttempt({
+            model, keyIndex, success: true, winner: true,
+            latencyMs: Date.now() - startTime,
+          });
+        }
+        yield chunk;
+      }
+      if (!recorded) {
+        // Stream completed without yielding — still a success (empty response)
         recordAttempt({
           model, keyIndex, success: true, winner: true,
           latencyMs: Date.now() - startTime,
         });
-        yield chunk;
       }
-      return; // success
+      return;
     } catch (err: any) {
+      if (!recorded) {
+        recordAttempt({
+          model, keyIndex, success: false, winner: false,
+          latencyMs: Date.now() - startTime,
+        });
+      }
       lastError = err;
-      const latencyMs = Date.now() - startTime;
-      recordAttempt({
-        model, keyIndex, success: false, winner: false, latencyMs,
-      });
       if (err.statusCode === 429) {
         await new Promise(r => setTimeout(r, 1000));
       }
