@@ -403,6 +403,28 @@ async function handleChatSSE(
   } catch { /* client may have disconnected */ }
 }
 
+// GET /api/chat/diag — diagnostic endpoint
+chatRouter.get("/diag", async (_req: Request, res: Response) => {
+  try {
+    const diag: any = {};
+    diag.step1 = "started";
+
+    const { getAppConfig } = await import("../lib/app-config.js");
+    diag.step2 = "imported config";
+    const config = await getAppConfig();
+    diag.step3 = "got config";
+    diag.hasGeminiKeys = config.geminiApiKeys.length > 0;
+    diag.geminiKeyCount = config.geminiApiKeys.length;
+    diag.geminiModels = config.geminiModels;
+    diag.configSource = config.source;
+
+    diag.step4 = "ok";
+    res.json(diag);
+  } catch (err: any) {
+    res.json({ error: err.message, stack: err.stack });
+  }
+});
+
 // POST /api/chat — text + optional image
 chatRouter.post("/", async (req: Request, res: Response) => {
   try {
