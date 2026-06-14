@@ -109,6 +109,7 @@ async function navigateTo(page, params) {
 async function renderSPAPage(page, params) {
   chatEls.forEach(el => { if (el) el.style.display = 'none'; });
   spaNav.classList.add('visible');
+  spaBackBtn.style.display = page === 'product' ? 'none' : '';
   pageView.classList.add('visible');
   if (page === 'product') {
     await renderPageProduct(params?.slug);
@@ -1607,6 +1608,7 @@ function chatAboutProduct(productId, action) {
   const product = productCatalog.find(p => p.id === productId || p.slug === productId);
   if (!product) return;
   currentProduct = product;
+  pendingProductId = product.id;
   conversationMode = product.id === 'orgonite_perso' ? 'C' : 'B';
   chatEls.forEach(el => { if (el) el.style.display = ''; });
   spaNav.classList.remove('visible');
