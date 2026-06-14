@@ -5,6 +5,7 @@ interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
+  trustedHtml?: boolean;
   imageBase64?: string;
   imageMimeType?: string;
   product?: ProductData;
@@ -52,6 +53,7 @@ export function ChatMessageBubble({
   role,
   content,
   isStreaming,
+  trustedHtml,
   imageBase64,
   imageMimeType,
   product,
@@ -60,7 +62,7 @@ export function ChatMessageBubble({
   onOrderProduct,
 }: ChatMessageProps) {
   const isUser = role === "user";
-  const displayContent = cleanMessageContent(content);
+  const displayContent = cleanMessageContent(content, trustedHtml);
   const productCards = uniqueProducts(product, products);
 
   return (
@@ -73,9 +75,11 @@ export function ChatMessageBubble({
             : "bg-muted text-foreground rounded-bl-md"
         )}
       >
-        <p className="whitespace-pre-wrap break-words">
-          {displayContent}
-        </p>
+        {trustedHtml ? (
+          <div className="prose prose-sm prose-invert max-w-none break-words [&_iframe]:max-w-full [&_iframe]:rounded-lg [&_iframe]:mb-3 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold" dangerouslySetInnerHTML={{ __html: displayContent }} />
+        ) : (
+          <p className="whitespace-pre-wrap break-words">{displayContent}</p>
+        )}
 
         {imageBase64 && imageMimeType && (
           <img
@@ -106,11 +110,12 @@ export function ChatMessageBubble({
   );
 }
 
-function cleanMessageContent(content: string) {
-  return content
-    .replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "")
-    .replace(/<[^>]*>/g, "")
-    .trim();
+function cleanMessageContent(content: string, trustedHtml?: boolean) {
+  let cleaned = content.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "");
+  if (!trustedHtml) {
+    cleaned = cleaned.replace(/<[^>]*>/g, "");
+  }
+  return cleaned.trim();
 }
 
 function uniqueProducts(product?: ProductData, products?: ProductData[]) {

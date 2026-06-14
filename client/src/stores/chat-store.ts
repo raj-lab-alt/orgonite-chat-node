@@ -32,6 +32,7 @@ export interface ChatMessage {
   product?: ProductData;
   products?: ProductData[];
   order?: OrderData;
+  trustedHtml?: boolean;
 }
 
 export type ConversationMode = "A" | "B" | "C";

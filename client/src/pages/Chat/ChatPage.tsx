@@ -21,13 +21,18 @@ export default function ChatPage() {
   const [showAudio, setShowAudio] = useState(false);
   const [welcomeMsg, setWelcomeMsg] = useState("");
   const [welcomeProduct, setWelcomeProduct] = useState<any>(null);
+  const [welcomeDone, setWelcomeDone] = useState(false);
   const [error, setError] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const welcomeShown = useRef(false);
 
   useEffect(() => {
     fetchTracking().then((data) => {
-      if (data?.welcomeMessage) setWelcomeMsg(data.welcomeMessage);
+      if (data?.welcomeMessage) {
+        setWelcomeMsg(data.welcomeMessage);
+        setWelcomeDone(true);
+      }
     });
     if (productId) {
       fetchProducts().then((products) => {
@@ -36,6 +41,20 @@ export default function ChatPage() {
       });
     }
   }, [productId]);
+
+  useEffect(() => {
+    if (welcomeDone && !welcomeShown.current && messages.length === 0) {
+      welcomeShown.current = true;
+      addMessage({
+        id: `welcome_${Date.now()}`,
+        role: "assistant",
+        content: welcomeMsg,
+        timestamp: Date.now(),
+        product: welcomeProduct || undefined,
+        trustedHtml: true,
+      });
+    }
+  }, [welcomeDone, welcomeProduct]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -220,6 +239,7 @@ export default function ChatPage() {
             key={msg.id}
             role={msg.role}
             content={msg.content}
+            trustedHtml={msg.trustedHtml}
             imageBase64={msg.imageBase64}
             imageMimeType={msg.imageMimeType}
             product={msg.product}
