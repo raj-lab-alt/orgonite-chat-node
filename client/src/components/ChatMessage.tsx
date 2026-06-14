@@ -76,7 +76,7 @@ export function ChatMessageBubble({
         )}
       >
         {trustedHtml ? (
-          <div className="prose prose-sm prose-invert max-w-none break-words [&_iframe]:max-w-full [&_iframe]:rounded-lg [&_iframe]:mb-3 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold" dangerouslySetInnerHTML={{ __html: displayContent }} />
+          <div className="text-sm leading-relaxed [&_iframe]:max-w-full [&_iframe]:rounded-lg [&_iframe]:mb-3 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:font-semibold" dangerouslySetInnerHTML={{ __html: displayContent }} />
         ) : (
           <p className="whitespace-pre-wrap break-words">{displayContent}</p>
         )}
