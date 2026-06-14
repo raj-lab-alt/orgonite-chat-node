@@ -229,18 +229,10 @@ export default function ChatPage() {
           />
         ))}
 
-        {isStreaming && !streamingContent && (
-          <div className="flex w-full mb-4 justify-start">
-            <div className="max-w-[80%] rounded-2xl px-4 py-3 text-sm bg-muted text-foreground rounded-bl-md">
-              <p className="text-muted-foreground animate-pulse">amine...</p>
-            </div>
-          </div>
-        )}
-
-        {isStreaming && streamingContent && (
+        {isStreaming && (
           <ChatMessageBubble
             role="assistant"
-            content={streamingContent}
+            content={streamingContent || ""}
             isStreaming
             onOrderProduct={handleOrderProduct}
           />
