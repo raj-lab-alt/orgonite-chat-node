@@ -14,8 +14,19 @@ fs.cpSync(legacyDir, distDir, { recursive: true });
 console.log("Legacy client copied to dist/");
 
 // 2. React build -> dist-react/ (production, used by the server when present).
-execSync("npx vite build --outDir dist-react", {
-  cwd: clientDir,
-  stdio: "inherit",
-});
-console.log("React build succeeded (dist-react/)");
+// Some shared hosts install production dependencies only. Keep the legacy client
+// deployable if the React toolchain is unavailable on the host.
+try {
+  execSync("npx vite build --outDir dist-react", {
+    cwd: clientDir,
+    stdio: "inherit",
+  });
+  console.log("React build succeeded (dist-react/)");
+} catch {
+  const reactIndex = path.join(clientDir, "dist-react", "index.html");
+  if (fs.existsSync(reactIndex)) {
+    console.log("React build failed; keeping existing dist-react/");
+  } else {
+    console.log("React build failed; serving legacy dist/ fallback");
+  }
+}

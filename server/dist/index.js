@@ -26,8 +26,7 @@ dotenv_1.default.config({ path: (0, path_1.resolve)(__dirname, "../../.env") });
 const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY", "GEMINI_API_KEYS"];
 const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
 if (missing.length > 0) {
-    logger_js_1.logger.error(`ENV manquantes: ${missing.join(", ")}`);
-    process.exit(1);
+    logger_js_1.logger.warn(`ENV manquantes: ${missing.join(", ")}. API features may be degraded until configured.`);
 }
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
