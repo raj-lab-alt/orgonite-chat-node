@@ -52,8 +52,7 @@ function nonEmptyString(value: unknown, fallback: string) {
 }
 
 function validGeminiModels(models: string[]): string[] {
-  const valid = models.filter((m) => /^gemini-/.test(m));
-  return valid.length > 0 ? valid : ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  return models.filter((m) => /^gemini-/.test(m));
 }
 
 function readPromptFallback() {

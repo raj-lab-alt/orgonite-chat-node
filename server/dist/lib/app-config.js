@@ -38,8 +38,7 @@ function nonEmptyString(value, fallback) {
     return typeof value === "string" && value.trim() ? value : fallback;
 }
 function validGeminiModels(models) {
-    const valid = models.filter((m) => /^gemini-/.test(m));
-    return valid.length > 0 ? valid : ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    return models.filter((m) => /^gemini-/.test(m));
 }
 function readPromptFallback() {
     const promptFile = (0, path_1.resolve)(process.cwd(), "prompt-amine-structure.txt");

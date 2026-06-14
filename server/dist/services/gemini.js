@@ -149,6 +149,10 @@ async function* chatGeminiRequestStream(message, extraFields, history, productId
     if (models.length === 0) {
         models = await (0, gemini_models_js_1.refreshModelList)(apiKeys[0]);
     }
+    // Ultimate fallback if refresh also failed
+    if (models.length === 0) {
+        models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    }
     const mode = (conversationMode || (productId === "orgonite_perso" ? "C" : productId ? "B" : "A")).toUpperCase();
     const trimmedHistory = history.slice(0, 100);
     const messages = [...trimmedHistory];
