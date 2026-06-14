@@ -394,13 +394,24 @@ exports.chatRouter.get("/diag", async (_req, res) => {
     }
 });
 // POST /api/chat — text + optional image
-// TEST: delayed response to check if Express 5 auto-next() is the issue
+// TEST: checkRateLimit only
 exports.chatRouter.post("/", (req, res) => {
-    setTimeout(() => {
-        if (!res.writableEnded) {
-            res.json({ ok: true, delayed: true, msg: req.body?.message || "" });
+    setTimeout(async () => {
+        try {
+            await (0, rate_limit_js_1.checkRateLimit)(req.ip);
         }
-    }, 100);
+        catch (err) {
+            const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
+            console.error("[checkRateLimit error]", errMsg);
+            if (!res.writableEnded) {
+                res.json({ ok: false, step: "checkRateLimit", error: errMsg });
+            }
+            return;
+        }
+        if (!res.writableEnded) {
+            res.json({ ok: true, step: "checkRateLimit done" });
+        }
+    }, 0);
 });
 // POST /api/chat/voice — audio message
 exports.chatRouter.post("/voice", upload.single("audio"), async (req, res) => {
