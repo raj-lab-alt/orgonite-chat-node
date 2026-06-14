@@ -426,7 +426,7 @@ chatRouter.get("/diag", async (_req: Request, res: Response) => {
 });
 
 // POST /api/chat — text + optional image
-// TEST: full Zod + Gemini
+// TEST: generateChatResult
 chatRouter.post("/", (req: Request, res: Response) => {
   setTimeout(async () => {
     try {
@@ -446,9 +446,13 @@ chatRouter.post("/", (req: Request, res: Response) => {
         path: ["message"],
       }).parse(req.body);
 
-      const config = await getConfig();
+      const result = await generateChatResult(
+        body.message, { imageBase64: null, imageMimeType: null, audioBase64: null, audioMimeType: null },
+        body.history, body.productId || null, body.conversationMode, false,
+        body.productType, body.orderConfirmed, body.renderedProductIds
+      );
       if (!res.writableEnded) {
-        res.json({ ok: true, step: "zod+gemin", hasKeys: config.apiKeys.length > 0 });
+        res.json({ ok: true, step: "generateChatResult", replyLength: result.reply.length });
       }
     } catch (err: any) {
       const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
