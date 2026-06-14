@@ -152,6 +152,8 @@ let globalModelIndex = 0;
 let topModelIndex = 0;
 
 const MIN_SOLID_SAMPLES = 10;
+const KEY_COOLDOWN_MS = 5000;
+const keyCooldowns = new Map<number, number>();
 
 function getTopModels(models: string[]): string[] | null {
   const stats = getModelStats();
@@ -178,6 +180,12 @@ function pickModel(models: string[]): string {
 }
 
 function pickKeyIndex(apiKeysLength: number): number {
+  for (let i = 0; i < apiKeysLength; i++) {
+    const idx = globalKeyIndex++ % apiKeysLength;
+    const until = keyCooldowns.get(idx);
+    if (!until || Date.now() > until) return idx;
+  }
+  // All keys in cooldown — pick the next one anyway
   return globalKeyIndex++ % apiKeysLength;
 }
 
@@ -199,7 +207,8 @@ export async function* chatGeminiRequestStream(
   productType: string,
   systemPrompt: string,
   apiKeys: string[],
-  models: string[]
+  models: string[],
+  retryDepth = 0,
 ): AsyncGenerator<string> {
   if (!apiKeys.length) throw new Error("Aucune cle API Gemini configuree.");
 
@@ -303,13 +312,23 @@ export async function* chatGeminiRequestStream(
       }
       lastError = err;
       if (err.statusCode === 429) {
-        await new Promise(r => setTimeout(r, 1000));
+        keyCooldowns.set(keyIndex, Date.now() + KEY_COOLDOWN_MS);
+        await new Promise(r => setTimeout(r, 3000));
       }
       continue;
     }
   }
 
-  // All models failed — try refreshing the model list and retry once
+  // All models failed with 429 — wait and retry once
+  if (retryDepth < 1 && lastError && (lastError as any).statusCode === 429) {
+    await new Promise(r => setTimeout(r, 5000));
+    return yield* chatGeminiRequestStream(
+      message, extraFields, history, productId, conversationMode,
+      isVoice, productType, systemPrompt, apiKeys, models, retryDepth + 1
+    );
+  }
+
+  // Try refreshing the model list and retry once
   try {
     const newModels = await refreshModelList(apiKeys[0]);
     const changed = newModels.length !== models.length ||
