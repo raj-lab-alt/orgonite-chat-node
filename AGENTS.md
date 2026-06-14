@@ -1,5 +1,8 @@
 # Orgonite Chat Node.js
 
+## Règle absolue
+Chaque modification doit être commitée et **pushée sur GitHub** immédiatement. Hostinger déploie automatiquement depuis `main`. Si ce n'est pas pushé, ce n'est pas déployé.
+
 ## Stack
 - **Frontend**: React 19 + Vite + TypeScript + Tailwind CSS + shadcn/ui
 - **Backend**: Node.js + Express + TypeScript
