@@ -34,7 +34,7 @@ orgonite-chat-node/
 ## Environment variables
 Copy `.env.example` to `.env` and fill in:
 - `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` / `VITE_SUPABASE_ANON_KEY`
-- `GEMINI_API_KEYS` / `GEMINI_MODELS`
+- `GEMINI_API_KEYS`
 - `ADMIN_PASSWORD` (fallback if Supabase Auth not used)
 
 ## Supabase setup
