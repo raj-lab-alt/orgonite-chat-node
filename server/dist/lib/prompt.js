@@ -73,6 +73,15 @@ Quand la commande personnalisee est vraiment complete, la balise <ORDER> doit in
 N'utilise jamais un objet JSON imbrique "personnalisation" dans <ORDER>. Les cristaux, metaux et intention vont dans compositionPersonnalisee. Le prenom, nom de naissance et textes vibratoires vont dans briefFabrication. Les consignes complementaires vont dans notes.
 
 Ces donnees sont indispensables pour fabriquer la piece. Si une seule manque, demande-la au client au lieu de creer la commande.
+
+[COMMANDE PRODUIT STANDARD - PRODUITS DU CATALOGUE]
+Pour un produit du catalogue (non personnalise), cree une commande <ORDER> UNIQUEMENT quand le client confirme clairement qu'il veut commander.
+
+La balise <ORDER> doit inclure TOUS les champs suivants :
+<ORDER>{"nom":"...","telephone":"...","gouvernorat":"...","adresse":"...","produit":"Nom exact du produit depuis le catalogue"}</ORDER>
+
+N'inclus PAS de champs de personnalisation (formatPersonnalise, dateNaissance, etc.) pour un produit standard.
+Ne cree JAMAIS de commande s'il manque un champ obligatoire. Demande-le d'abord au client.
 `;
     const productTypePrompt = getProductTypePrompt(productType);
     const strictProhibitionAddendum = `

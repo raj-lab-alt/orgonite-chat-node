@@ -16,7 +16,7 @@ const DIAGNOSTIC_KEYS = new Set([
     "tel_raw",
     "doublon",
 ]);
-const DIAGNOSTIC_LINE_MARKER = /\[+\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]+|^(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*[:=-]/i;
+const DIAGNOSTIC_LINE_MARKER = /\[+\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]*|^(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*[:=-]/i;
 const DIAGNOSTIC_KEY_PATTERN = /\{?\b(?:lang|mode|type|intent|prenom|besoin|outil_cible|prix_dit|order_confirmed_flag|tel|tel_raw|doublon)\b\}?\s*=/gi;
 const SEPARATOR_LINE = /^\s*-{3,}\s*$/;
 function sanitizeAssistantReply(reply) {
@@ -32,7 +32,7 @@ function sanitizeAssistantReply(reply) {
 function stripInternalDiagnostics(reply) {
     let text = String(reply || "")
         .replace(/<\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>[\s\S]*?<\s*\/\s*(?:ETAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*>/gi, "\n")
-        .replace(/(?:^|\n)\s*\[{1,2}\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]?[^\n]*/gi, "\n")
+        .replace(/(?:^|\n)\s*\[+\s*(?:ETAT|ÉTAT|LANGUE|DEBUG|DIAG(?:NOSTIC)?|STATE|ANALYSE|ANALYSIS)\s*\]?[^\n]*/gi, "\n")
         .replace(/^\s*-{3,}\s*(?:\r?\n)?/, "");
     const lines = text.split(/\r?\n/);
     let removedDiagnostic = false;

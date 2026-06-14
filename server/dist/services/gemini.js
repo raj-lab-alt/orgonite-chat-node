@@ -164,8 +164,7 @@ function pickKeyIndex(apiKeysLength) {
 }
 function sanitizeEtatOutput(text) {
     text = (0, reply_sanitize_js_1.stripInternalDiagnostics)(text);
-    text = text.replace(/\{(\w+)\}=/g, '$1=');
-    text = text.replace(/\{\s*/g, '');
+    text = text.replace(/\{\s*(\w+)\}\s*=/g, '$1=');
     return text;
 }
 function maybeDiagnosticPrefix(text) {
@@ -177,6 +176,7 @@ function maybeDiagnosticPrefix(text) {
         "<ETAT", "<LANGUE", "<DEBUG", "<DIAG", "<STATE", "<ANALYSE", "<ANALYSIS",
         "ETAT", "ÉTAT", "LANGUE", "DEBUG", "DIAG", "STATE", "ANALYSE", "ANALYSIS",
         "LANG=", "{LANG", "MODE=", "{MODE", "TYPE=", "{TYPE", "INTENT=", "{INTENT",
+        "[[ETAT", "[[ÉTAT", "[[LANGUE", "[[DEBUG", "[[DIAG", "[[STATE", "[[ANALYSE", "[[ANALYSIS",
     ];
     return markers.some((marker) => marker.startsWith(trimmed) || trimmed.startsWith(marker));
 }

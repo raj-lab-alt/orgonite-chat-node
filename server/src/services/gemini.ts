@@ -202,8 +202,7 @@ function pickKeyIndex(apiKeysLength: number): number {
 
 function sanitizeEtatOutput(text: string): string {
   text = stripInternalDiagnostics(text);
-  text = text.replace(/\{(\w+)\}=/g, '$1=');
-  text = text.replace(/\{\s*/g, '');
+  text = text.replace(/\{\s*(\w+)\}\s*=/g, '$1=');
   return text;
 }
 
@@ -216,6 +215,7 @@ function maybeDiagnosticPrefix(text: string): boolean {
     "<ETAT", "<LANGUE", "<DEBUG", "<DIAG", "<STATE", "<ANALYSE", "<ANALYSIS",
     "ETAT", "ÉTAT", "LANGUE", "DEBUG", "DIAG", "STATE", "ANALYSE", "ANALYSIS",
     "LANG=", "{LANG", "MODE=", "{MODE", "TYPE=", "{TYPE", "INTENT=", "{INTENT",
+    "[[ETAT", "[[ÉTAT", "[[LANGUE", "[[DEBUG", "[[DIAG", "[[STATE", "[[ANALYSE", "[[ANALYSIS",
   ];
 
   return markers.some((marker) => marker.startsWith(trimmed) || trimmed.startsWith(marker));
