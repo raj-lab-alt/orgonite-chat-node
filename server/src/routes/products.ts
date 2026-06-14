@@ -174,7 +174,7 @@ productsRouter.post("/sync", requireAdmin, async (req: Request, res: Response) =
 
       const slug = p.slug || p.id.replace(/_/g, "-");
       let existing: any = null;
-      try { existing = await supabase.from("products").select("id").eq("id", p.id).single(); } catch {}
+      try { existing = await supabase.from("products").select("id").eq("id", p.id).single(); } catch { console.warn("[products] Failed to fetch existing product", p.id); }
 
       const productData = {
         id: p.id,

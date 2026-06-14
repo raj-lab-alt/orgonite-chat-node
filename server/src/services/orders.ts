@@ -203,68 +203,83 @@ export async function saveOrderWithoutDuplicate(
   const newName = normalizeOrderText(data.nom || "");
   const now = new Date().toISOString();
 
+  // Acquire advisory lock before dedup check (prevents TOCTOU race)
   if (newPhone) {
-    const twentyFourHoursAgo = new Date(Date.now() - 86400000).toISOString();
+    try { await supabase.rpc("try_acquire_dedup_lock", { p_phone: newPhone }); } catch { /* lock not available, proceed anyway */ }
+  }
 
-    const { data: existingOrders } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("telephone", newPhone)
-      .neq("statut", "corbeille")
-      .gte("date", twentyFourHoursAgo)
-      .order("date", { ascending: false });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (newPhone) {
+      const twentyFourHoursAgo = new Date(Date.now() - 86400000).toISOString();
 
-    if (existingOrders && existingOrders.length > 0) {
-      for (const existing of existingOrders) {
-        const sameProduct =
-          newProduct !== "" &&
-          normalizeOrderText(existing.produit || "") === newProduct;
-        const sameName =
-          newName !== "" &&
-          normalizeOrderText(existing.nom || "") === newName;
+      const { data: existingOrders } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("telephone", newPhone)
+        .neq("statut", "corbeille")
+        .gte("date", twentyFourHoursAgo)
+        .order("date", { ascending: false });
 
-        if (replaceRequested || fusionRequested || sameProduct || sameName || !newProduct) {
-          const dataToSave = fusionRequested
-            ? mergeOrderData(existing, data)
-            : { ...data };
+      if (existingOrders && existingOrders.length > 0) {
+        for (const existing of existingOrders) {
+          const sameProduct =
+            newProduct !== "" &&
+            normalizeOrderText(existing.produit || "") === newProduct;
+          const sameName =
+            newName !== "" &&
+            normalizeOrderText(existing.nom || "") === newName;
 
-          if (!fusionRequested) {
-            const backendNote = replaceRequested
-              ? "Backend: remplacement demande via remplace_commande. Commande existante mise a jour."
-              : "Backend: doublon detecte sur commande recente. Commande existante mise a jour.";
-            dataToSave.notes = appendNote(existing.notes || "", appendNote(dataToSave.notes || "", backendNote));
+          if (replaceRequested || fusionRequested || sameProduct || sameName || !newProduct) {
+            const dataToSave = fusionRequested
+              ? mergeOrderData(existing, data)
+              : { ...data };
+
+            if (!fusionRequested) {
+              const backendNote = replaceRequested
+                ? "Backend: remplacement demande via remplace_commande. Commande existante mise a jour."
+                : "Backend: doublon detecte sur commande recente. Commande existante mise a jour.";
+              dataToSave.notes = appendNote(existing.notes || "", appendNote(dataToSave.notes || "", backendNote));
+            }
+
+            delete dataToSave.remplace_commande;
+            delete dataToSave.fusion_avec;
+
+            const { error } = await supabase
+              .from("orders")
+              .update(orderToRow({ ...dataToSave, id: existing.id, updated_at: now }) as any)
+              .eq("id", existing.id);
+
+            if (error) throw error;
+
+            return {
+              order: { ...existing, ...dataToSave, updated_at: now },
+              created: false,
+            };
           }
-
-          delete dataToSave.remplace_commande;
-          delete dataToSave.fusion_avec;
-
-          const { error } = await supabase
-            .from("orders")
-            .update(orderToRow({ ...dataToSave, id: existing.id, updated_at: now }) as any)
-            .eq("id", existing.id);
-
-          if (error) throw error;
-
-          return {
-            order: { ...existing, ...dataToSave, updated_at: now },
-            created: false,
-          };
         }
       }
     }
+
+    data.id = data.id || generateOrderId();
+    data.date = now;
+    data.statut = data.statut || statuses[0];
+
+    delete data.remplace_commande;
+    delete data.fusion_avec;
+
+    const { error } = await supabase.from("orders").insert(orderToRow(data, true) as any);
+    if (error) {
+      // If unique violation (concurrent insert won), retry
+      if (attempt < 2 && newPhone && error.message?.includes("duplicate key")) {
+        continue;
+      }
+      throw error;
+    }
+
+    return { order: data, created: true };
   }
 
-  data.id = data.id || generateOrderId();
-  data.date = now;
-  data.statut = data.statut || statuses[0];
-
-  delete data.remplace_commande;
-  delete data.fusion_avec;
-
-  const { error } = await supabase.from("orders").insert(orderToRow(data, true) as any);
-  if (error) throw error;
-
-  return { order: data, created: true };
+  throw new Error("Impossible de sauvegarder la commande apres plusieurs tentatives");
 }
 
 function mergeOrderData(existing: OrderData, incoming: OrderData): OrderData {

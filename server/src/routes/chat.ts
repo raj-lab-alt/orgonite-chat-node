@@ -24,7 +24,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 async function getConfig() {
   const appConfig = await getAppConfig();
   let products: any[] = [];
-  try { const { data } = await supabase.from("products").select("*").eq("visible", true); if (data) products = data; } catch {}
+  try { const { data } = await supabase.from("products").select("*").eq("visible", true); if (data) products = data; } catch { console.warn("[chat] Failed to load products"); }
   return {
     apiKeys: appConfig.geminiApiKeys,
     models: appConfig.geminiModels,
@@ -342,12 +342,12 @@ chatRouter.post("/voice", upload.single("audio"), async (req: Request, res: Resp
 
     let history: any[] = [];
     if (req.body.history) {
-      try { history = JSON.parse(req.body.history as string); } catch {}
+      try { history = JSON.parse(req.body.history as string); } catch { console.warn("[chat] Invalid history JSON"); }
     }
 
     let renderedProductIds: string[] = [];
     if (req.body.renderedProductIds) {
-      try { renderedProductIds = JSON.parse(req.body.renderedProductIds as string); } catch {}
+      try { renderedProductIds = JSON.parse(req.body.renderedProductIds as string); } catch { console.warn("[chat] Invalid renderedProductIds JSON"); }
     }
 
     const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };

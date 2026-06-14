@@ -51,3 +51,13 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- Atomic dedup lock: acquire an advisory lock for a phone number
+-- Returns true when lock acquired, false if would block
+CREATE OR REPLACE FUNCTION try_acquire_dedup_lock(p_phone TEXT)
+RETURNS BOOLEAN LANGUAGE plpgsql AS $$
+BEGIN
+  -- hashtext returns int4, perfect for pg_try_advisory_xact_lock
+  RETURN pg_try_advisory_xact_lock(hashtext(COALESCE(p_phone, 'unknown')));
+END;
+$$;
