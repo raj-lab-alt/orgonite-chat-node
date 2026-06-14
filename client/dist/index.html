@@ -368,47 +368,6 @@
       cursor: default;
     }
 
-    /* ─── Typing indicator premium ─── */
-    #typingIndicator {
-      display: none;
-      align-self: flex-start;
-      background: rgba(18, 18, 32, 0.8);
-      backdrop-filter: blur(8px);
-      border-radius: 18px;
-      border-bottom-left-radius: 5px;
-      padding: 10px 16px;
-      flex-direction: row;
-      align-items: center;
-      gap: 10px;
-      border: 1px solid rgba(140, 110, 255, 0.06);
-      animation: bubbleInLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .typing-dots {
-      display: flex;
-      gap: 4px;
-      align-items: center;
-    }
-    .typing-dots span {
-      width: 7px;
-      height: 7px;
-      background: rgba(180, 140, 255, 0.5);
-      border-radius: 50%;
-      animation: typingBounce 1.4s infinite ease-in-out both;
-    }
-    .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
-    .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
-    .typing-dots span:nth-child(3) { animation-delay: 0s; }
-    .typing-label {
-      font-size: 11.5px;
-      color: rgba(148, 163, 184, 0.5);
-      font-weight: 500;
-    }
-
-    @keyframes typingBounce {
-      0%, 60%, 100% { transform: translateY(0); opacity: 0.25; background: rgba(180, 140, 255, 0.25); }
-      30% { transform: translateY(-5px); opacity: 1; background: rgba(180, 140, 255, 0.65); }
-    }
-
     @keyframes bubbleInLeft {
       from { opacity: 0; transform: translateX(-24px) scale(0.96); }
       to { opacity: 1; transform: translateX(0) scale(1); }
@@ -736,10 +695,7 @@
           <div class="msg-meta">Maintenant</div>
         </div>
       </div>
-      <div id="typingIndicator" role="status" aria-live="polite">
-        <div class="typing-dots"><span></span><span></span><span></span></div>
-        <span class="typing-label">Amine écrit...</span>
-      </div>
+      
       <div id="scrollAnchor"></div>
     </div>
 

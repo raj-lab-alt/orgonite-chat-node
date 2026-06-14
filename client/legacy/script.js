@@ -924,14 +924,9 @@ function inferProductsFromText(text) {
 }
 
 function showTyping() {
-  const anchor = document.getElementById('scrollAnchor');
-  messagesEl.insertBefore(typingIndicator, anchor);
-  typingIndicator.style.display = 'flex';
-  scrollChatToBottom('smooth', true);
 }
 
 function hideTyping() {
-  typingIndicator.style.display = 'none';
 }
 
 function addImagePreview(file) {
