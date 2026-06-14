@@ -2,6 +2,7 @@ node_modules/
 dist/
 !server/dist/
 !client/dist/
+!client/dist-react/
 .env
 .env.local
 *.log

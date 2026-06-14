@@ -80,15 +80,26 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
   });
 });
 
-const clientDist = resolve(__dirname, "../../client/dist");
+// Prefer dist-react/ (React build), fall back to dist/ (legacy PHP)
+const reactDist = resolve(__dirname, "../../client/dist-react");
+const clientDist = existsSync(reactDist) ? reactDist : resolve(__dirname, "../../client/dist");
+const adminHtml = resolve(clientDist, "admin.html");
+const adminExists = existsSync(adminHtml);
+
 if (existsSync(clientDist)) {
   app.use(express.static(clientDist));
   app.get(["/admin", "/admin/"], (_req, res) => {
-    res.sendFile(resolve(clientDist, "admin.html"));
+    if (adminExists) {
+      res.sendFile(adminHtml);
+    } else {
+      res.sendFile(resolve(clientDist, "index.html"));
+    }
   });
-  app.get("/sitemap.xml", (_req, res) => {
-    res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
-  });
+  if (adminExists) {
+    app.get("/sitemap.xml", (_req, res) => {
+      res.type("application/xml").send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+    });
+  }
   app.use((_req, res) => {
     res.sendFile(resolve(clientDist, "index.html"));
   });
