@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { useAdminStore } from "@/stores/admin-store";
-import { useAdminWs } from "@/hooks/useAdminWs";
+import { useAdminWs, type WsStatus } from "@/hooks/useAdminWs";
 import LoginPage from "./LoginPage";
 import DashboardPage from "./DashboardPage";
 import OrdersPage from "./OrdersPage";
@@ -26,13 +26,13 @@ export default function AdminPage() {
 
   const [toast, setToast] = useState<{ id: number; nom: string; produit?: string } | null>(null);
   const toastIdRef = useRef(0);
-
-  useAdminWs((ev) => {
+  const wsStatus = useAdminWs((ev) => {
     if (ev.event === "new_order") {
       const data = ev.data as any;
       setNewOrderCount((c) => c + 1);
       const id = ++toastIdRef.current;
       setToast({ id, nom: data?.nom || "Commande", produit: data?.produit });
+      window.dispatchEvent(new CustomEvent("admin:new-order", { detail: data }));
       setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 4000);
     }
   });
@@ -68,8 +68,18 @@ export default function AdminPage() {
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
               O
             </div>
-            <div>
-              <p className="text-sm font-semibold">Orgonite Admin</p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold">Orgonite Admin</p>
+                <span
+                  className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${
+                    wsStatus === "connected" ? "bg-green-500" :
+                    wsStatus === "connecting" ? "bg-amber-400 animate-pulse" :
+                    "bg-destructive"
+                  }`}
+                  title={wsStatus === "connected" ? "Connecte" : wsStatus === "connecting" ? "Connexion..." : "Deconnecte"}
+                />
+              </div>
             </div>
           </div>
         </div>

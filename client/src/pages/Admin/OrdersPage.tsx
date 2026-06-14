@@ -46,6 +46,9 @@ export default function OrdersPage() {
 
   useEffect(() => {
     loadOrders();
+    const handler = () => loadOrders();
+    window.addEventListener("admin:new-order", handler);
+    return () => window.removeEventListener("admin:new-order", handler);
   }, [loadOrders]);
 
   const filtered = orders.filter((o) => {
