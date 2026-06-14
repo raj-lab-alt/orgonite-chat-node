@@ -807,6 +807,17 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
           const inferredProduct = inferredProducts.find(p => p && (p.id === id || p.slug === id));
           const product = apiProduct || inferredProduct || productCatalog.find(p => p.id === id || p.slug === id);
           if (!product) return;
+          console.log('[DEBUG product data]', JSON.stringify({
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            price: product.price,
+            currency: product.currency,
+            imageUrl: product.imageUrl,
+            image_url: product.image_url,
+            benefits: (product.benefits || '').substring(0, 60),
+            catName: productCatalog.find(p => p.id === product.id)?.name || 'NOT FOUND',
+          }));
           const cardEl = renderProductCardWithButtons(product);
           messagesEl.insertBefore(cardEl, anchor);
           requestAnimationFrame(() => {
