@@ -115,6 +115,7 @@ function cleanMessageContent(content: string, trustedHtml?: boolean) {
     .replace(/<ORDER>[\s\S]*?<\/ORDER>/gi, "")
     .replace(/<ORDER>[\s\S]*$/gi, "")
     .replace(/\{\s*"nom"\s*:[\s\S]*?\}/g, "")
+    .replace(/(?:^|\n)\s*\[{1,2}ETAT\][^\n]*(?:\n\s*-{3,}\s*)?/gi, "\n")
     .replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "");
 
   if (trustedHtml) {

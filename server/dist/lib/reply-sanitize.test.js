@@ -29,5 +29,9 @@ const reply_sanitize_js_1 = require("./reply-sanitize.js");
         const reply = `{"lang":"fr","mode":"vente","type":"hello"}\n{"lang":"en","mode":"info","type":"question"}\nBonjour`;
         (0, vitest_1.expect)((0, reply_sanitize_js_1.sanitizeAssistantReply)(reply)).toBe("Bonjour");
     });
+    (0, vitest_1.it)("strips state diagnostic blocks", () => {
+        const reply = `[[ETAT] {lang}=fr | {mode}=A | {type}=protection | {intent}=decouverte\n-----\nBonjour`;
+        (0, vitest_1.expect)((0, reply_sanitize_js_1.sanitizeAssistantReply)(reply)).toBe("Bonjour");
+    });
 });
 //# sourceMappingURL=reply-sanitize.test.js.map

@@ -16,13 +16,18 @@ const DIAGNOSTIC_KEYS = new Set([
     "doublon",
 ]);
 function sanitizeAssistantReply(reply) {
-    let cleaned = stripDiagnosticJsonAtStart(reply);
+    let cleaned = stripStateDiagnosticBlocks(stripDiagnosticJsonAtStart(reply));
     cleaned = cleaned.replace(/```json\s*\{[\s\S]*?\}\s*```/gi, (block) => {
         const json = block.replace(/^```json\s*/i, "").replace(/\s*```$/i, "");
         return isDiagnosticJson(json) ? "" : block;
     });
     cleaned = cleaned.replace(/---\s*INSTRUCTION STRICTE[^]*?(?=\[RENDER_PRODUCT|$)/gi, "").trim();
     return cleaned.trim();
+}
+function stripStateDiagnosticBlocks(reply) {
+    return reply
+        .replace(/(?:^|\n)\s*\[{1,2}ETAT\][^\n]*(?:\n\s*-{3,}\s*)?/gi, "\n")
+        .trimStart();
 }
 function stripDiagnosticJsonAtStart(reply) {
     let text = reply.trimStart();

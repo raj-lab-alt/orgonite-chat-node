@@ -497,6 +497,7 @@ function stripInternalPromptTags(text) {
   return String(text || '')
     .replace(/\[(?:MODE A|MODE B|MODE C)\]\s*/gi, '')
     .replace(/\[INSTRUCTION\][\s\S]*?\[\/INSTRUCTION\]\s*/gi, '')
+    .replace(/(?:^|\n)\s*\[{1,2}ETAT\][^\n]*(?:\n\s*-{3,}\s*)?/gi, '\n')
     .trim();
 }
 

@@ -34,4 +34,9 @@ describe("sanitizeAssistantReply", () => {
     const reply = `{"lang":"fr","mode":"vente","type":"hello"}\n{"lang":"en","mode":"info","type":"question"}\nBonjour`;
     expect(sanitizeAssistantReply(reply)).toBe("Bonjour");
   });
+
+  it("strips state diagnostic blocks", () => {
+    const reply = `[[ETAT] {lang}=fr | {mode}=A | {type}=protection | {intent}=decouverte\n-----\nBonjour`;
+    expect(sanitizeAssistantReply(reply)).toBe("Bonjour");
+  });
 });
