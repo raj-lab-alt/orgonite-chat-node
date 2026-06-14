@@ -426,21 +426,38 @@ chatRouter.get("/diag", async (_req: Request, res: Response) => {
 });
 
 // POST /api/chat — text + optional image
-// TEST: checkRateLimit only
+// TEST: full Zod + Gemini
 chatRouter.post("/", (req: Request, res: Response) => {
   setTimeout(async () => {
     try {
-      await checkRateLimit(req.ip);
+      const body = z.object({
+        message: z.string().max(2000).default(""),
+        imageBase64: z.string().nullable().optional(),
+        imageMimeType: z.string().nullable().optional(),
+        productId: z.string().nullable().optional(),
+        productType: z.string().default("general"),
+        conversationMode: z.string().default(""),
+        history: z.array(z.any()).default([]),
+        renderedProductIds: z.array(z.string()).default([]),
+        orderConfirmed: z.boolean().default(false),
+        stream: z.boolean().optional(),
+      }).refine((value) => value.message.trim().length > 0 || Boolean(value.imageBase64), {
+        message: "message ou image requis",
+        path: ["message"],
+      }).parse(req.body);
+
+      const config = await getConfig();
+      if (!res.writableEnded) {
+        res.json({ ok: true, step: "zod+gemin", hasKeys: config.apiKeys.length > 0 });
+      }
     } catch (err: any) {
       const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
-      console.error("[checkRateLimit error]", errMsg);
-      if (!res.writableEnded) {
-        res.json({ ok: false, step: "checkRateLimit", error: errMsg });
+      console.error("[handler error]", errMsg);
+      if (err instanceof z.ZodError) {
+        if (!res.writableEnded) res.json({ ok: false, step: "zod", errors: err.errors.map((e: any) => e.message) });
+      } else {
+        if (!res.writableEnded) res.json({ ok: false, step: "unknown", error: errMsg });
       }
-      return;
-    }
-    if (!res.writableEnded) {
-      res.json({ ok: true, step: "checkRateLimit done" });
     }
   }, 0);
 });

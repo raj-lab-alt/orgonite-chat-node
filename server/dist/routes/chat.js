@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.chatRouter = void 0;
 const express_1 = require("express");
+const zod_1 = require("zod");
 const multer_1 = __importDefault(require("multer"));
 const supabase_js_1 = require("../lib/supabase.js");
 const prompt_js_1 = require("../lib/prompt.js");
@@ -394,22 +395,41 @@ exports.chatRouter.get("/diag", async (_req, res) => {
     }
 });
 // POST /api/chat — text + optional image
-// TEST: checkRateLimit only
+// TEST: full Zod + Gemini
 exports.chatRouter.post("/", (req, res) => {
     setTimeout(async () => {
         try {
-            await (0, rate_limit_js_1.checkRateLimit)(req.ip);
+            const body = zod_1.z.object({
+                message: zod_1.z.string().max(2000).default(""),
+                imageBase64: zod_1.z.string().nullable().optional(),
+                imageMimeType: zod_1.z.string().nullable().optional(),
+                productId: zod_1.z.string().nullable().optional(),
+                productType: zod_1.z.string().default("general"),
+                conversationMode: zod_1.z.string().default(""),
+                history: zod_1.z.array(zod_1.z.any()).default([]),
+                renderedProductIds: zod_1.z.array(zod_1.z.string()).default([]),
+                orderConfirmed: zod_1.z.boolean().default(false),
+                stream: zod_1.z.boolean().optional(),
+            }).refine((value) => value.message.trim().length > 0 || Boolean(value.imageBase64), {
+                message: "message ou image requis",
+                path: ["message"],
+            }).parse(req.body);
+            const config = await getConfig();
+            if (!res.writableEnded) {
+                res.json({ ok: true, step: "zod+gemin", hasKeys: config.apiKeys.length > 0 });
+            }
         }
         catch (err) {
             const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
-            console.error("[checkRateLimit error]", errMsg);
-            if (!res.writableEnded) {
-                res.json({ ok: false, step: "checkRateLimit", error: errMsg });
+            console.error("[handler error]", errMsg);
+            if (err instanceof zod_1.z.ZodError) {
+                if (!res.writableEnded)
+                    res.json({ ok: false, step: "zod", errors: err.errors.map((e) => e.message) });
             }
-            return;
-        }
-        if (!res.writableEnded) {
-            res.json({ ok: true, step: "checkRateLimit done" });
+            else {
+                if (!res.writableEnded)
+                    res.json({ ok: false, step: "unknown", error: errMsg });
+            }
         }
     }, 0);
 });
