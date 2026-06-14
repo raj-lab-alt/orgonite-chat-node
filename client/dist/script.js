@@ -1289,8 +1289,8 @@ function injectCodProductStyles() {
 
     /* ── Full page overrides ── */
     .cod-product-page.is-fullpage {
-      width: 100%; max-width: 100%;
-      margin: 0; border-radius: 0; border: none;
+      width: min(100%, 768px);
+      margin: 0 auto; border-radius: 0; border: none;
       box-shadow: none; background: transparent;
       animation: none;
     }
