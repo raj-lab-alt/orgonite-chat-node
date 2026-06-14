@@ -428,6 +428,10 @@ chatRouter.get("/diag", async (_req: Request, res: Response) => {
 // POST /api/chat — text + optional image
 chatRouter.post("/", async (req: Request, res: Response) => {
   try {
+    // test: just echo
+    try { res.json({ ok: true, received: req.body?.message }); return; } catch {}
+
+    // (original code below)
     await checkRateLimit(req.ip);
     const body = z.object({
       message: z.string().max(2000).default(""),
