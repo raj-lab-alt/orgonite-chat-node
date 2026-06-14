@@ -16,11 +16,12 @@ trackingRouter.get("/tracking", async (_req: Request, res: Response) => {
 
 trackingRouter.get("/track-visit", async (req: Request, res: Response) => {
   try {
-    const sessionKey = req.query.session || req.ip || "unknown";
+    const rawKey = req.query.session || req.ip || "unknown";
+    const sessionKey = String(rawKey).slice(0, 64);
     const pageUrl = (req.query.url as string) || "/";
 
     await supabase.from("page_views").insert({
-      session_key: String(sessionKey),
+      session_key: sessionKey,
       is_admin: false,
       page_url: pageUrl,
     });

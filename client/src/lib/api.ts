@@ -1,5 +1,19 @@
 const BASE = ""; // proxied by Vite
 
+function getSessionKey() {
+  const storageKey = "orgonite_session_key";
+  try {
+    let sessionKey = localStorage.getItem(storageKey);
+    if (!sessionKey) {
+      sessionKey = `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      localStorage.setItem(storageKey, sessionKey);
+    }
+    return sessionKey;
+  } catch {
+    return `sess-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
 export async function fetchTracking() {
   const res = await fetch(`${BASE}/api/tracking`);
   if (!res.ok) return null;
@@ -53,6 +67,7 @@ export async function sendMessage({
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
+        "X-Session-Key": getSessionKey(),
       },
       body: JSON.stringify({
         message,
@@ -142,7 +157,10 @@ export async function sendVoiceMessage(params: {
 
     const res = await fetch(`${BASE}/api/chat/voice?stream=1`, {
       method: "POST",
-      headers: { Accept: "text/event-stream" },
+      headers: {
+        Accept: "text/event-stream",
+        "X-Session-Key": getSessionKey(),
+      },
       body: formData,
     });
 

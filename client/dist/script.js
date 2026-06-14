@@ -328,6 +328,20 @@ if (!window.fbq) {
 window.dataLayer = window.dataLayer || [];
 window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
 
+function getSessionKey() {
+  const storageKey = 'orgonite_session_key';
+  try {
+    let sessionKey = localStorage.getItem(storageKey);
+    if (!sessionKey) {
+      sessionKey = 'sess-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem(storageKey, sessionKey);
+    }
+    return sessionKey;
+  } catch {
+    return 'sess-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+  }
+}
+
 function fetchWithTimeout(url, opts = {}, timeoutMs = 30000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -401,12 +415,15 @@ function trackPurchase(order) {
 
 function adminChatHeaders() {
   const token = sessionStorage.getItem('admin_token') || localStorage.getItem('admin_token');
-  return token ? { 'Authorization': 'Bearer ' + token } : {};
+  return {
+    'X-Session-Key': getSessionKey(),
+    ...(token ? { 'Authorization': 'Bearer ' + token } : {})
+  };
 }
 
 function trackVisit() {
   const url = window.location.pathname + window.location.search || '/';
-  fetch('/api/track-visit?url=' + encodeURIComponent(url), {
+  fetch('/api/track-visit?url=' + encodeURIComponent(url) + '&session=' + encodeURIComponent(getSessionKey()), {
     method: 'GET', cache: 'no-store',
     headers: { ...adminChatHeaders() }
   }).catch(() => {});

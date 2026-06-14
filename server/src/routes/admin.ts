@@ -136,11 +136,12 @@ adminRouter.get("/stats", requireAdmin, async (req: Request, res: Response) => {
       .gte("date", since);
 
     // Page views
-    const { count: uniqueVisitors } = await supabase
+    const { data: pageViews } = await supabase
       .from("page_views")
-      .select("*", { count: "exact", head: true })
+      .select("session_key")
       .eq("is_admin", false)
       .gte("created_at", since);
+    const uniqueVisitors = new Set((pageViews || []).map((row) => row.session_key).filter(Boolean)).size;
 
     const totalOrders = orders?.length || 0;
     const deliveredOrders = orders?.filter((o) => o.statut === "livree").length || 0;
