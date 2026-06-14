@@ -764,6 +764,15 @@ function afficherMessageAmine(apiResponseText, apiProducts = [], options = {}) {
     : inferProductsFromText(cleanedText);
   const inferredProductIds = inferredProducts.map(p => p.id || p.slug).filter(Boolean);
   const productIdsToRender = [...new Set([...extractedIds, ...apiProductIds, ...inferredProductIds])];
+  console.log('[DEBUG card]', JSON.stringify({
+    replyPreview: (apiResponseText || '').substring(0, 120),
+    extractedIds,
+    apiProductIds,
+    apiProductsCount: Array.isArray(apiProducts) ? apiProducts.length : 0,
+    inferredCount: inferredProducts.length,
+    productIdsToRender,
+    catLen: Array.isArray(productCatalog) ? productCatalog.length : 0,
+  }));
   let formattedHtml = formatChatText(cleanedText);
 
   const messageBubble = document.createElement('div');
