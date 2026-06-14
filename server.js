@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
+console.log("[server.js] Starting up v2...");
 const distPath = path.join(__dirname, "server", "dist", "index.js");
 
 if (!fs.existsSync(distPath)) {
