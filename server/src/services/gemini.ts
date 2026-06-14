@@ -182,14 +182,11 @@ function pickKeyIndex(apiKeysLength: number): number {
 }
 
 function sanitizeEtatOutput(text: string): string {
-  const lines = text.split('\n');
-  return lines.map(line => {
-    if (line.includes('[ETAT]') || line.includes('[LANGUE]')) {
-      line = line.replace(/\{(\w+)\}=/g, '$1=');
-      line = line.replace(/\{\s*/g, '');
-    }
-    return line;
-  }).join('\n');
+  text = text.replace(/\{?\[ETAT\].*?(?:\n|$)/g, '');
+  text = text.replace(/\{?\[LANGUE\].*?(?:\n|$)/g, '');
+  text = text.replace(/\{(\w+)\}=/g, '$1=');
+  text = text.replace(/\{\s*/g, '');
+  return text;
 }
 
 export async function* chatGeminiRequestStream(
@@ -259,6 +256,8 @@ export async function* chatGeminiRequestStream(
 
     const startTime = Date.now();
     let recorded = false;
+    let stateBuf = '';      // accumulator for ETAT block (before -----)
+    let streaming = false;  // true once ----- is found
     try {
       for await (const chunk of callGeminiStream(apiKey, model, contents, systemPrompt)) {
         if (!recorded) {
@@ -268,10 +267,27 @@ export async function* chatGeminiRequestStream(
             latencyMs: Date.now() - startTime,
           });
         }
-        yield sanitizeEtatOutput(chunk);
+
+        if (!streaming) {
+          stateBuf += chunk;
+          const sepIdx = stateBuf.indexOf('-----');
+          if (sepIdx !== -1) {
+            streaming = true;
+            const afterSep = stateBuf.slice(sepIdx + 5);
+            stateBuf = '';
+            if (afterSep) {
+              yield sanitizeEtatOutput(afterSep);
+            }
+          }
+        } else {
+          yield sanitizeEtatOutput(chunk);
+        }
+      }
+      // Fallback: no separator found — yield everything
+      if (!streaming && stateBuf) {
+        yield sanitizeEtatOutput(stateBuf);
       }
       if (!recorded) {
-        // Stream completed without yielding — still a success (empty response)
         recordAttempt({
           model, keyIndex, success: true, winner: true,
           latencyMs: Date.now() - startTime,
