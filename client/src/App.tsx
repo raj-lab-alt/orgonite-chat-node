@@ -13,7 +13,7 @@ function HomePage() {
   const navigate = useNavigate();
   const setProduct = useChatStore((s) => s.setProduct);
   const setMode = useChatStore((s) => s.setMode);
-  const slug = searchParams.get("slug");
+  const slug = searchParams.get("slug") || searchParams.get("product");
 
   useEffect(() => {
     if (slug) {
