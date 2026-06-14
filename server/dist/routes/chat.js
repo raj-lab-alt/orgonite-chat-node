@@ -446,11 +446,24 @@ exports.chatRouter.get("/diag", async (_req, res) => {
         res.json({ error: err.message, stack: err.stack });
     }
 });
+// GET /api/chat/ping — sync test
+exports.chatRouter.get("/ping", (_req, res) => {
+    res.json({ ok: true, ts: Date.now() });
+});
+// POST /api/chat/echo — setTimeout(0) test
+exports.chatRouter.post("/echo", (req, res) => {
+    setTimeout(() => {
+        try {
+            res.json({ ok: true, body: req.body, ts: Date.now() });
+        }
+        catch (e) {
+            if (!res.headersSent)
+                res.status(500).json({ error: e.message });
+        }
+    }, 0);
+});
 // POST /api/chat — text + optional image
 exports.chatRouter.post("/", (req, res) => {
-    // Use setTimeout(0) to prevent Express 5's async handler detection from
-    // interfering with the response lifecycle. This ensures the handler returns
-    // before any async work begins, avoiding auto-next() behavior.
     setTimeout(async () => {
         try {
             await (0, rate_limit_js_1.checkRateLimit)(req.ip);
@@ -481,21 +494,7 @@ exports.chatRouter.post("/", (req, res) => {
             };
             const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
             if (wantsStream) {
-                (async () => {
-                    try {
-                        if (!res.writableEnded) {
-                            await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
-                        }
-                    }
-                    catch (e) {
-                        if (!res.writableEnded) {
-                            try {
-                                res.end();
-                            }
-                            catch { }
-                        }
-                    }
-                })();
+                await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
                 return;
             }
             const result = await generateChatResult(message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);

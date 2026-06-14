@@ -477,11 +477,24 @@ chatRouter.get("/diag", async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/chat/ping — sync test
+chatRouter.get("/ping", (_req: Request, res: Response) => {
+  res.json({ ok: true, ts: Date.now() });
+});
+
+// POST /api/chat/echo — setTimeout(0) test
+chatRouter.post("/echo", (req: Request, res: Response) => {
+  setTimeout(() => {
+    try {
+      res.json({ ok: true, body: req.body, ts: Date.now() });
+    } catch (e: any) {
+      if (!res.headersSent) res.status(500).json({ error: e.message });
+    }
+  }, 0);
+});
+
 // POST /api/chat — text + optional image
 chatRouter.post("/", (req: Request, res: Response) => {
-  // Use setTimeout(0) to prevent Express 5's async handler detection from
-  // interfering with the response lifecycle. This ensures the handler returns
-  // before any async work begins, avoiding auto-next() behavior.
   setTimeout(async () => {
     try {
       await checkRateLimit(req.ip);
@@ -515,15 +528,7 @@ chatRouter.post("/", (req: Request, res: Response) => {
 
       const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
       if (wantsStream) {
-        (async () => {
-          try {
-            if (!res.writableEnded) {
-              await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
-            }
-          } catch (e: any) {
-            if (!res.writableEnded) { try { res.end(); } catch {} }
-          }
-        })();
+        await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
         return;
       }
 
