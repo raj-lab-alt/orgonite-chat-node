@@ -1432,12 +1432,6 @@ function injectCodProductStyles() {
       font-weight: 900;
       margin-bottom: 4px;
     }
-    .chat-product-benefits {
-      color: #94a3b8;
-      font-size: 12px;
-      line-height: 1.4;
-      margin-bottom: 6px;
-    }
     .chat-product-actions {
       display: flex;
       gap: 6px;
@@ -1585,9 +1579,8 @@ function renderProductCardWithButtons(product) {
 
 function renderChatProductCardWithButtons(product) {
   injectCodProductStyles();
-  const root = document.createElement('article');
+  const root = document.createElement('div');
   const productId = product.id || product.slug || '';
-  const benefits = String(product.benefits || '').split('.').filter(Boolean).slice(0, 2).join('. ') || 'Un outil vibratoire a porter au quotidien.';
   root.className = 'chat-product-card';
   root.dataset.productId = productId;
   root.innerHTML = `
@@ -1595,7 +1588,6 @@ function renderChatProductCardWithButtons(product) {
     <div class="chat-product-body">
       <div class="chat-product-title">${escapeHtml(product.name || 'Orgonite')}</div>
       <div class="chat-product-price">${money(product.price)}</div>
-      <div class="chat-product-benefits">${escapeHtml(benefits)}</div>
       <div class="chat-product-actions">
         <button class="cod-btn cod-btn-primary" type="button" onclick="chatAboutProduct('${escapeHtml(productId)}', 'commander')">Commander</button>
         <button class="cod-btn cod-btn-secondary" type="button" onclick="chatAboutProduct('${escapeHtml(productId)}', 'question')">Poser une question</button>
