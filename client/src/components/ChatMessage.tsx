@@ -111,11 +111,58 @@ export function ChatMessageBubble({
 }
 
 function cleanMessageContent(content: string, trustedHtml?: boolean) {
-  let cleaned = content.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "");
+  let cleaned = content
+    .replace(/<ORDER>[\s\S]*?<\/ORDER>/gi, "")
+    .replace(/<ORDER>[\s\S]*$/gi, "")
+    .replace(/\{\s*"nom"\s*:[\s\S]*?\}/g, "")
+    .replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "");
+
+  if (trustedHtml) {
+    return sanitizeTrustedHtml(cleaned).trim();
+  }
+
   if (!trustedHtml) {
     cleaned = cleaned.replace(/<[^>]*>/g, "");
   }
+
   return cleaned.trim();
+}
+
+function sanitizeTrustedHtml(html: string) {
+  if (typeof document === "undefined") return html.replace(/<[^>]*>/g, "");
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+
+  const allowedTags = new Set(["A", "B", "BR", "EM", "I", "IFRAME", "LI", "OL", "P", "STRONG", "UL"]);
+  const allowedAttrs: Record<string, Set<string>> = {
+    A: new Set(["href", "target", "rel"]),
+    IFRAME: new Set(["allow", "allowfullscreen", "height", "loading", "src", "title", "width"]),
+  };
+
+  for (const el of [...template.content.querySelectorAll("*")]) {
+    if (!allowedTags.has(el.tagName)) {
+      el.replaceWith(...el.childNodes);
+      continue;
+    }
+
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase();
+      const value = attr.value.trim();
+      const allowed = allowedAttrs[el.tagName]?.has(name) ?? false;
+      const unsafeUrl = (name === "href" || name === "src") && !/^https?:\/\//i.test(value);
+
+      if (!allowed || name.startsWith("on") || unsafeUrl) {
+        el.removeAttribute(attr.name);
+      }
+    }
+
+    if (el.tagName === "A") {
+      el.setAttribute("rel", "noopener noreferrer");
+    }
+  }
+
+  return template.innerHTML;
 }
 
 function uniqueProducts(product?: ProductData, products?: ProductData[]) {

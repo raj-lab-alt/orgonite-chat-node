@@ -11,6 +11,19 @@ function nextId() {
   return `msg_${Date.now()}_${++msgIdCounter}`;
 }
 
+function collectRenderedProductIds(messages: ChatMessage[]) {
+  const ids = new Set<string>();
+
+  for (const msg of messages) {
+    const productList = [msg.product, ...(msg.products || [])].filter(Boolean);
+    for (const product of productList) {
+      if (product?.id) ids.add(String(product.id));
+    }
+  }
+
+  return [...ids];
+}
+
 export default function ChatPage() {
   const {
     messages, isStreaming, streamingContent, mode, productId, productType,
@@ -79,6 +92,7 @@ export default function ChatPage() {
 
       // If assistant hasn't spoken yet + mode A, use welcome message
       const currentMessages = useChatStore.getState().messages;
+      const renderedProductIds = collectRenderedProductIds(currentMessages);
       const msgCount = currentMessages.filter((m) => m.role === "assistant").length;
       const currentMode = useChatStore.getState().mode;
 
@@ -113,6 +127,7 @@ export default function ChatPage() {
         productType,
         conversationMode: mode,
         history,
+        renderedProductIds,
         orderConfirmed,
         signal: controller.signal,
         onChunk: (chunk) => {
@@ -171,6 +186,7 @@ export default function ChatPage() {
 
       setStreaming(true);
       clearStream();
+      const renderedProductIds = collectRenderedProductIds(useChatStore.getState().messages);
 
       sendVoiceMessage({
         audioBlob: blob,
@@ -179,6 +195,7 @@ export default function ChatPage() {
         productType,
         conversationMode: mode,
         history: JSON.stringify(history),
+        renderedProductIds,
         onChunk: (chunk) => appendStream(chunk),
         onDone: (data) => {
           const assistantMsg: ChatMessage = {

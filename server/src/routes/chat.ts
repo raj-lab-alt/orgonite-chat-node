@@ -18,6 +18,7 @@ import { getAppConfig } from "../lib/app-config.js";
 import { formatProduct } from "../lib/product-format.js";
 import { sanitizeAssistantReply } from "../lib/reply-sanitize.js";
 import { logger } from "../lib/logger.js";
+import { requireAdmin } from "../middleware/auth.js";
 
 export const chatRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -82,6 +83,30 @@ function stripPrematureUpsell(reply: string, message: string, orderConfirmed: bo
     .trim();
 
   return cleaned || reply;
+}
+
+function toClientReply(reply: string, productList: any[]) {
+  let cleanReply = reply
+    .replace(/<ORDER>[\s\S]*?<\/ORDER>/gi, "")
+    .replace(/<ORDER>[\s\S]*$/gi, "")
+    .replace(/\{\s*"nom"\s*:[\s\S]*?\}/g, "")
+    .replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "")
+    .trim();
+
+  if (productList.length === 0) {
+    cleanReply = cleanReply
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\[[^\]]+\]/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
+  return cleanReply;
+}
+
+function errorStatus(err: any) {
+  const status = Number(err?.statusCode || err?.status);
+  return status >= 400 && status < 600 ? status : 500;
 }
 
 function productNameInMessage(message: string, products: any[]): Set<string> {
@@ -241,17 +266,7 @@ async function generateChatResult(
     }
   }
 
-  let cleanFinalReply = reply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
-
-  // Guard: if Gemini invented a product (no valid RENDER_PRODUCT tag found, but brackets with invented names remain)
-  if (productList.length === 0) {
-    // Strip invented [bracketed product names] that aren't markdown links
-    cleanFinalReply = cleanFinalReply
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-      .replace(/\[[^\]]+\]/g, "")
-      .replace(/\s{2,}/g, " ")
-      .trim();
-  }
+  const cleanFinalReply = toClientReply(reply, productList);
 
   return { reply: cleanFinalReply, order: savedOrder, product: productData, products: productList };
 }
@@ -331,7 +346,7 @@ async function handleChatSSE(
   let orderValidationReply = "";
   let productData = null;
   let productList: any[] = [];
-  let replyForClient = fullReply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+  let replyForClient = toClientReply(sanitizeAssistantReply(fullReply), []);
 
   try {
     visibleReply = sanitizeAssistantReply(fullReply);
@@ -380,14 +395,7 @@ async function handleChatSSE(
       }
     }
 
-    replyForClient = fullReply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
-    if (productList.length === 0) {
-      replyForClient = replyForClient
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-        .replace(/\[[^\]]+\]/g, "")
-        .replace(/\s{2,}/g, " ")
-        .trim();
-    }
+    replyForClient = toClientReply(reply, productList);
   } catch (err: any) {
     logger.error("handleChatSSE phase2 error", { error: err.message });
   }
@@ -404,7 +412,7 @@ async function handleChatSSE(
 }
 
 // GET /api/chat/diag — diagnostic endpoint
-chatRouter.get("/diag", async (_req: Request, res: Response) => {
+chatRouter.get("/diag", requireAdmin, async (_req: Request, res: Response) => {
   try {
     const diag: any = {};
     diag.step1 = "started";
@@ -421,7 +429,7 @@ chatRouter.get("/diag", async (_req: Request, res: Response) => {
     diag.step4 = "ok";
     res.json(diag);
   } catch (err: any) {
-    res.json({ error: err.message, stack: err.stack });
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -463,7 +471,15 @@ chatRouter.post("/", (req: Request, res: Response) => {
 
       const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
       if (wantsStream) {
-        await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
+        (async () => {
+          try {
+            if (!res.writableEnded) {
+              await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
+            }
+          } catch (e: any) {
+            if (!res.writableEnded) { try { res.end(); } catch {} }
+          }
+        })();
         return;
       }
 
@@ -486,7 +502,8 @@ chatRouter.post("/", (req: Request, res: Response) => {
       const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
       logger.error("Chat error", { error: errMsg });
       if (!res.writableEnded) {
-        res.status(500).json({ error: "Erreur interne du serveur" });
+        const status = errorStatus(err);
+        res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
       }
     }
   }, 0);
@@ -531,9 +548,11 @@ chatRouter.post("/voice", upload.single("audio"), async (req: Request, res: Resp
     await recordConversationStats(req, conversationMode, result);
     res.json(result);
   } catch (err: any) {
-    logger.error("Voice chat error", { error: (err instanceof Error ? err.message : String(err)) });
+    const errMsg = err instanceof Error ? err.message : String(err);
+    logger.error("Voice chat error", { error: errMsg });
     if (!res.headersSent) {
-      res.status(500).json({ error: "Erreur interne du serveur" });
+      const status = errorStatus(err);
+      res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
     }
   }
 });

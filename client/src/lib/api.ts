@@ -42,6 +42,7 @@ export interface SendMessageParams {
   productType?: string;
   conversationMode?: string;
   history?: { role: string; text?: string; imageBase64?: string; imageMimeType?: string }[];
+  renderedProductIds?: string[];
   orderConfirmed?: boolean;
   onChunk: (text: string) => void;
   onDone: (data: { reply: string; order?: OrderData; product?: ProductData; products?: ProductData[] }) => void;
@@ -57,6 +58,7 @@ export async function sendMessage({
   productType = "general",
   conversationMode = "A",
   history = [],
+  renderedProductIds = [],
   orderConfirmed = false,
   onChunk,
   onDone,
@@ -79,6 +81,7 @@ export async function sendMessage({
         productType,
         conversationMode,
         history,
+        renderedProductIds,
         orderConfirmed,
         stream: true,
       }),
@@ -144,6 +147,7 @@ export async function sendVoiceMessage(params: {
   productType?: string;
   conversationMode?: string;
   history?: string;
+  renderedProductIds?: string[];
   onChunk: (text: string) => void;
   onDone: (data: { reply: string; order?: OrderData; product?: ProductData; products?: ProductData[] }) => void;
   onError: (err: string) => void;
@@ -156,6 +160,7 @@ export async function sendVoiceMessage(params: {
     if (params.productType) formData.append("productType", params.productType);
     if (params.conversationMode) formData.append("conversationMode", params.conversationMode);
     if (params.history) formData.append("history", params.history);
+    if (params.renderedProductIds) formData.append("renderedProductIds", JSON.stringify(params.renderedProductIds));
 
     const res = await fetch(`${BASE}/api/chat/voice?stream=1`, {
       method: "POST",

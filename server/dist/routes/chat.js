@@ -49,6 +49,7 @@ const app_config_js_1 = require("../lib/app-config.js");
 const product_format_js_1 = require("../lib/product-format.js");
 const reply_sanitize_js_1 = require("../lib/reply-sanitize.js");
 const logger_js_1 = require("../lib/logger.js");
+const auth_js_1 = require("../middleware/auth.js");
 exports.chatRouter = (0, express_1.Router)();
 const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 async function getConfig() {
@@ -106,6 +107,26 @@ function stripPrematureUpsell(reply, message, orderConfirmed, hasOrder) {
         .replace(/(?:^|\n).*2 outils[\s\S]*$/i, "")
         .trim();
     return cleaned || reply;
+}
+function toClientReply(reply, productList) {
+    let cleanReply = reply
+        .replace(/<ORDER>[\s\S]*?<\/ORDER>/gi, "")
+        .replace(/<ORDER>[\s\S]*$/gi, "")
+        .replace(/\{\s*"nom"\s*:[\s\S]*?\}/g, "")
+        .replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "")
+        .trim();
+    if (productList.length === 0) {
+        cleanReply = cleanReply
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+            .replace(/\[[^\]]+\]/g, "")
+            .replace(/\s{2,}/g, " ")
+            .trim();
+    }
+    return cleanReply;
+}
+function errorStatus(err) {
+    const status = Number(err?.statusCode || err?.status);
+    return status >= 400 && status < 600 ? status : 500;
 }
 function productNameInMessage(message, products) {
     const lower = message.toLowerCase();
@@ -235,16 +256,7 @@ async function generateChatResult(message, extraFields, history, productId, conv
             productList.splice(0, productList.length, ...filtered);
         }
     }
-    let cleanFinalReply = reply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
-    // Guard: if Gemini invented a product (no valid RENDER_PRODUCT tag found, but brackets with invented names remain)
-    if (productList.length === 0) {
-        // Strip invented [bracketed product names] that aren't markdown links
-        cleanFinalReply = cleanFinalReply
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-            .replace(/\[[^\]]+\]/g, "")
-            .replace(/\s{2,}/g, " ")
-            .trim();
-    }
+    const cleanFinalReply = toClientReply(reply, productList);
     return { reply: cleanFinalReply, order: savedOrder, product: productData, products: productList };
 }
 async function handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed = false, renderedProductIds = []) {
@@ -308,7 +320,7 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
     let orderValidationReply = "";
     let productData = null;
     let productList = [];
-    let replyForClient = fullReply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
+    let replyForClient = toClientReply((0, reply_sanitize_js_1.sanitizeAssistantReply)(fullReply), []);
     try {
         visibleReply = (0, reply_sanitize_js_1.sanitizeAssistantReply)(fullReply);
         const orderResult = (0, orders_js_1.detectOrderFromReply)(visibleReply);
@@ -350,14 +362,7 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
                 productList.splice(0, productList.length, ...filtered);
             }
         }
-        replyForClient = fullReply.replace(/\[RENDER_PRODUCT:\s*[a-zA-Z0-9_]+\]/g, "").trim();
-        if (productList.length === 0) {
-            replyForClient = replyForClient
-                .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-                .replace(/\[[^\]]+\]/g, "")
-                .replace(/\s{2,}/g, " ")
-                .trim();
-        }
+        replyForClient = toClientReply(reply, productList);
     }
     catch (err) {
         logger_js_1.logger.error("handleChatSSE phase2 error", { error: err.message });
@@ -375,7 +380,7 @@ async function handleChatSSE(req, res, message, extraFields, history, productId,
     catch { /* client may have disconnected */ }
 }
 // GET /api/chat/diag — diagnostic endpoint
-exports.chatRouter.get("/diag", async (_req, res) => {
+exports.chatRouter.get("/diag", auth_js_1.requireAdmin, async (_req, res) => {
     try {
         const diag = {};
         diag.step1 = "started";
@@ -391,7 +396,7 @@ exports.chatRouter.get("/diag", async (_req, res) => {
         res.json(diag);
     }
     catch (err) {
-        res.json({ error: err.message, stack: err.stack });
+        res.status(500).json({ error: err.message });
     }
 });
 // POST /api/chat — text + optional image
@@ -429,7 +434,21 @@ exports.chatRouter.post("/", (req, res) => {
             };
             const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
             if (wantsStream) {
-                await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
+                (async () => {
+                    try {
+                        if (!res.writableEnded) {
+                            await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
+                        }
+                    }
+                    catch (e) {
+                        if (!res.writableEnded) {
+                            try {
+                                res.end();
+                            }
+                            catch { }
+                        }
+                    }
+                })();
                 return;
             }
             const result = await generateChatResult(message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
@@ -450,7 +469,8 @@ exports.chatRouter.post("/", (req, res) => {
             const errMsg = err && typeof err === "object" ? (err.message || String(err)) : String(err);
             logger_js_1.logger.error("Chat error", { error: errMsg });
             if (!res.writableEnded) {
-                res.status(500).json({ error: "Erreur interne du serveur" });
+                const status = errorStatus(err);
+                res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
             }
         }
     }, 0);
@@ -497,9 +517,11 @@ exports.chatRouter.post("/voice", upload.single("audio"), async (req, res) => {
         res.json(result);
     }
     catch (err) {
-        logger_js_1.logger.error("Voice chat error", { error: (err instanceof Error ? err.message : String(err)) });
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger_js_1.logger.error("Voice chat error", { error: errMsg });
         if (!res.headersSent) {
-            res.status(500).json({ error: "Erreur interne du serveur" });
+            const status = errorStatus(err);
+            res.status(status).json({ error: status === 429 ? errMsg : "Erreur interne du serveur" });
         }
     }
 });
