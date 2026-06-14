@@ -77,8 +77,7 @@ export async function sendMessage({
     orderConfirmed,
   };
 
-  await trySSE(body, onChunk, onDone, onError, signal) ||
-    tryJSON(body, onDone, onError, signal);
+  await tryJSON(body, onDone, onError, signal);
 }
 
 async function trySSE(
