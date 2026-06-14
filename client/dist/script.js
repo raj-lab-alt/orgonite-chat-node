@@ -1393,58 +1393,58 @@ function injectCodProductStyles() {
     .cod-proof-bar strong { color: #22C55E; }
 
     .chat-product-card {
+      display: flex; gap: 12px; padding: 10px;
       width: 100%; max-width: 360px;
       align-self: flex-start;
       margin: 4px 0 14px;
-      border-radius: 18px;
-      overflow: hidden;
+      border-radius: 14px;
       background: rgba(18, 18, 32, 0.96);
       border: 1px solid rgba(140, 110, 255, 0.18);
       box-shadow: 0 16px 42px rgba(0, 0, 0, 0.38);
       color: #e2e8f0;
+      min-height: 90px;
       animation: cardSlideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .chat-product-card img {
-      width: 100%;
-      aspect-ratio: 4 / 3;
-      max-height: 220px;
+      width: 70px; height: 70px;
       object-fit: cover;
-      display: block;
+      border-radius: 10px;
+      flex-shrink: 0;
       background: #0f172a;
     }
     .chat-product-body {
-      padding: 13px 14px 14px;
+      flex: 1; min-width: 0;
+      display: flex; flex-direction: column;
+      justify-content: center;
     }
     .chat-product-title {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 800;
       color: #f8fafc;
-      margin-bottom: 5px;
+      line-height: 1.3;
+      margin-bottom: 2px;
     }
     .chat-product-price {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
       color: #22c55e;
-      font-size: 18px;
+      font-size: 15px;
       font-weight: 900;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
     .chat-product-benefits {
-      color: #a0a8b8;
-      font-size: 13px;
-      line-height: 1.5;
-      margin-bottom: 12px;
+      color: #94a3b8;
+      font-size: 12px;
+      line-height: 1.4;
+      margin-bottom: 6px;
     }
     .chat-product-actions {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 8px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
     }
     .chat-product-actions .cod-btn {
-      padding: 11px 14px;
-      border-radius: 12px;
-      font-size: 14px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
     }
   `;
   document.head.appendChild(style);
