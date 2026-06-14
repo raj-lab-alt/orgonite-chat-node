@@ -1,4 +1,3 @@
-import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { ProductData, OrderData } from "@/stores/chat-store";
 
@@ -62,36 +61,7 @@ export function ChatMessageBubble({
 }: ChatMessageProps) {
   const isUser = role === "user";
   const displayContent = cleanMessageContent(content);
-  const [displayed, setDisplayed] = useState(isUser ? displayContent : isStreaming ? displayContent : "");
-  const indexRef = useRef(0);
   const productCards = uniqueProducts(product, products);
-
-  useEffect(() => {
-    if (isUser) {
-      setDisplayed(displayContent);
-      return;
-    }
-
-    if (isStreaming) {
-      setDisplayed(displayContent);
-      return;
-    }
-
-    indexRef.current = 0;
-    setDisplayed("");
-
-    if (!displayContent) return;
-
-    const interval = setInterval(() => {
-      indexRef.current++;
-      setDisplayed(displayContent.slice(0, indexRef.current));
-      if (indexRef.current >= displayContent.length) {
-        clearInterval(interval);
-      }
-    }, 15);
-
-    return () => clearInterval(interval);
-  }, [displayContent, isUser, isStreaming]);
 
   return (
     <div className={cn("flex w-full mb-4", isUser ? "justify-end" : "justify-start")}>
@@ -104,7 +74,7 @@ export function ChatMessageBubble({
         )}
       >
         <p className="whitespace-pre-wrap break-words">
-          {displayed}
+          {displayContent}
           {isStreaming && (
             <span className="inline-block w-1.5 h-4 ml-0.5 bg-current" />
           )}
