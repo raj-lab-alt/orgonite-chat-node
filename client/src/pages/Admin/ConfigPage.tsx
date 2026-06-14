@@ -7,12 +7,14 @@ export default function ConfigPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [systemPrompt, setSystemPrompt] = useState("");
+  const [welcomeMessage, setWelcomeMessage] = useState("");
 
   useEffect(() => {
     getConfig()
       .then((data) => {
         setConfig(data);
         setSystemPrompt(data.systemPrompt || "");
+        setWelcomeMessage(data.welcomeMessage || "");
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -22,7 +24,7 @@ export default function ConfigPage() {
     setSaving(true);
     setMessage("");
     try {
-      await updateConfig({ systemPrompt });
+      await updateConfig({ systemPrompt, welcomeMessage });
       setMessage("Configuration sauvegardee");
     } catch (err: any) {
       setMessage(err.message);
@@ -52,6 +54,20 @@ export default function ConfigPage() {
           {message}
         </div>
       )}
+
+      {/* Welcome Message */}
+      <div className="rounded-xl border bg-card p-4 space-y-3">
+        <h2 className="font-semibold">Message d'accueil</h2>
+        <p className="text-xs text-muted-foreground">
+          Texte affiché au premier chargement du chat (index)
+        </p>
+        <textarea
+          value={welcomeMessage}
+          onChange={(e) => setWelcomeMessage(e.target.value)}
+          className="w-full border rounded px-3 py-2 text-xs leading-relaxed"
+          rows={4}
+        />
+      </div>
 
       {/* System Prompt */}
       <div className="rounded-xl border bg-card p-4 space-y-3">
