@@ -19,6 +19,7 @@ const content = [
   "PassengerNodejs " + nodeBin,
   "PassengerAppType node",
   "PassengerStartupFile " + startupFile,
+  "PassengerBufferResponse off",
   "",
 ].join("\n");
 
