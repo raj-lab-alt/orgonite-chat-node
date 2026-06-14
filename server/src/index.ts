@@ -14,6 +14,13 @@ import { requireAdmin } from "./middleware/auth.js";
 
 dotenv.config({ path: resolve(__dirname, "../../.env") });
 
+const REQUIRED_ENV = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY", "GEMINI_API_KEYS"];
+const missing = REQUIRED_ENV.filter((key) => !process.env[key]);
+if (missing.length > 0) {
+  console.error(`[FATAL] ENV manquantes: ${missing.join(", ")}`);
+  process.exit(1);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -22,6 +29,18 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "*" }));
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    const line = `${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`;
+    if (res.statusCode >= 500) console.error(`[ERR] ${line}`);
+    else if (res.statusCode >= 400) console.warn(`[WARN] ${line}`);
+    else console.log(`[INFO] ${line}`);
+  });
+  next();
+});
 
 app.use("/api/chat", chatRouter);
 app.use("/api/orders", ordersRouter);

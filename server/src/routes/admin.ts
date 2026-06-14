@@ -1,8 +1,20 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { supabase } from "../lib/supabase.js";
 import { requireAdmin } from "../middleware/auth.js";
 import { adminPassword, adminToken, isSupabaseAdminUser, verifyAdminPassword } from "../lib/admin-auth.js";
 import { getAppConfig, maskApiKeys, updateAppConfig } from "../lib/app-config.js";
+
+const configSchema = z.object({
+  systemPrompt: z.string().min(1).max(50000).optional(),
+  catalogItemTemplate: z.string().min(1).max(10000).optional(),
+  welcomeMessage: z.string().min(1).max(5000).optional(),
+  facebookPixelIds: z.array(z.string().min(1).max(100)).max(20).optional(),
+  googleAnalyticsIds: z.array(z.string().min(1).max(100)).max(20).optional(),
+  statuses: z.array(z.string().min(1).max(50)).min(1).max(50).optional(),
+  apiKeys: z.array(z.string().min(10).max(500)).max(10).optional(),
+  models: z.array(z.string().min(1).max(100)).min(1).max(20).optional(),
+});
 
 export const adminRouter = Router();
 
@@ -91,28 +103,24 @@ adminRouter.get("/config", requireAdmin, async (_req: Request, res: Response) =>
 
 adminRouter.put("/config", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const body = req.body;
-    const update: any = {};
+    const parsed = configSchema.parse(req.body);
+    const update: Record<string, unknown> = {};
 
-    if (body.systemPrompt !== undefined) update.systemPrompt = String(body.systemPrompt);
-    if (body.catalogItemTemplate !== undefined) update.catalogItemTemplate = String(body.catalogItemTemplate);
-    if (body.welcomeMessage !== undefined) update.welcomeMessage = String(body.welcomeMessage);
-    if (body.facebookPixelIds !== undefined) update.facebookPixelIds = normalizeStringList(body.facebookPixelIds);
-    if (body.googleAnalyticsIds !== undefined) update.googleAnalyticsIds = normalizeStringList(body.googleAnalyticsIds);
-    if (body.statuses !== undefined) update.statuses = normalizeStringList(body.statuses);
-    if (body.apiKeys !== undefined) update.geminiApiKeys = normalizeStringList(body.apiKeys);
-    if (body.models !== undefined) update.geminiModels = normalizeStringList(body.models);
-
-    if (update.statuses?.length === 0) {
-      return res.status(400).json({ error: "Au moins un statut est requis" });
-    }
-    if (update.geminiModels?.length === 0) {
-      return res.status(400).json({ error: "Au moins un modele Gemini est requis" });
-    }
+    if (parsed.systemPrompt !== undefined) update.systemPrompt = parsed.systemPrompt;
+    if (parsed.catalogItemTemplate !== undefined) update.catalogItemTemplate = parsed.catalogItemTemplate;
+    if (parsed.welcomeMessage !== undefined) update.welcomeMessage = parsed.welcomeMessage;
+    if (parsed.facebookPixelIds !== undefined) update.facebookPixelIds = parsed.facebookPixelIds;
+    if (parsed.googleAnalyticsIds !== undefined) update.googleAnalyticsIds = parsed.googleAnalyticsIds;
+    if (parsed.statuses !== undefined) update.statuses = parsed.statuses;
+    if (parsed.apiKeys !== undefined) update.geminiApiKeys = parsed.apiKeys;
+    if (parsed.models !== undefined) update.geminiModels = parsed.models;
 
     await updateAppConfig(update);
     res.json(await buildConfigResponse());
   } catch (err: any) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation echouee", details: err.errors });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -258,7 +266,3 @@ adminRouter.post("/migrate-schema", requireAdmin, async (_req: Request, res: Res
   }
 });
 
-function normalizeStringList(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item).trim()).filter(Boolean);
-}
