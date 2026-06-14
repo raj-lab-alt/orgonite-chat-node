@@ -263,7 +263,7 @@ function sanitizeHtml(html) {
   const template = document.createElement('template');
   template.innerHTML = String(html ?? '');
   const allowedTags = new Set(['BR', 'STRONG', 'B', 'EM', 'I', 'U', 'P', 'DIV', 'SPAN', 'IFRAME', 'A']);
-  const allowedAttrs = new Set(['src', 'target', 'rel', 'allow', 'allowfullscreen', 'frameborder', 'scrolling', 'style', 'href']);
+  const allowedAttrs = new Set(['src', 'target', 'rel', 'allow', 'allowfullscreen', 'frameborder', 'scrolling', 'href']);
   template.content.querySelectorAll('*').forEach(node => {
     if (!allowedTags.has(node.tagName)) {
       node.replaceWith(document.createTextNode(node.textContent || ''));
@@ -275,6 +275,15 @@ function sanitizeHtml(html) {
         node.removeAttribute(attr.name);
       }
     });
+    if (node.tagName === 'A') {
+      const href = node.getAttribute('href') || '';
+      if (!isSafeLinkUrl(href)) {
+        node.removeAttribute('href');
+      }
+      if (node.getAttribute('target') === '_blank') {
+        node.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
     if (node.tagName === 'IFRAME') {
       const src = node.getAttribute('src') || '';
       if (!src.startsWith('https://www.facebook.com/plugins/video.php')) {
@@ -283,6 +292,18 @@ function sanitizeHtml(html) {
     }
   });
   return template.innerHTML;
+}
+
+function isSafeLinkUrl(url) {
+  const value = String(url || '').trim();
+  if (!value) return false;
+  if (value.startsWith('/') || value.startsWith('#')) return true;
+  try {
+    const parsed = new URL(value, window.location.origin);
+    return ['http:', 'https:', 'mailto:', 'tel:'].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
 }
 
 function formatChatText(text) {

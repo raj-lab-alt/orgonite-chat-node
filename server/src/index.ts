@@ -31,6 +31,9 @@ app.use("/api/admin/products", requireAdmin, productsRouter);
 app.use("/api/admin/services", requireAdmin, servicesRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api", trackingRouter);
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "Route API introuvable" });
+});
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

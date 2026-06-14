@@ -32,6 +32,9 @@ app.use("/api/admin/products", auth_js_1.requireAdmin, products_js_1.productsRou
 app.use("/api/admin/services", auth_js_1.requireAdmin, services_js_1.servicesRouter);
 app.use("/api/admin", admin_js_1.adminRouter);
 app.use("/api", tracking_js_1.trackingRouter);
+app.use("/api", (_req, res) => {
+    res.status(404).json({ error: "Route API introuvable" });
+});
 app.get("/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
 });

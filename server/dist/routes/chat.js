@@ -93,6 +93,44 @@ function missingOrderFields(orderData) {
         .filter(([key]) => !String(orderData?.[key] || "").trim())
         .map(([, label]) => label);
 }
+function conversationSessionKey(req) {
+    const headerKey = req.headers["x-session-key"];
+    const rawKey = Array.isArray(headerKey) ? headerKey[0] : headerKey;
+    return String(rawKey || req.ip || "unknown").slice(0, 64);
+}
+async function recordConversationStats(req, mode, result) {
+    try {
+        const sessionKey = conversationSessionKey(req);
+        const normalizedMode = (mode || "A").slice(0, 1).toUpperCase();
+        const stage = result.order ? "commande" : result.products?.length ? "produit" : "conversation";
+        const { data } = await supabase_js_1.supabase
+            .from("conversation_stats")
+            .select("messages_count")
+            .eq("session_key", sessionKey)
+            .maybeSingle();
+        if (data) {
+            await supabase_js_1.supabase
+                .from("conversation_stats")
+                .update({
+                mode: normalizedMode,
+                messages_count: (data.messages_count || 0) + 2,
+                stage,
+                updated_at: new Date().toISOString(),
+            })
+                .eq("session_key", sessionKey);
+            return;
+        }
+        await supabase_js_1.supabase.from("conversation_stats").insert({
+            session_key: sessionKey,
+            mode: normalizedMode,
+            messages_count: 2,
+            stage,
+        });
+    }
+    catch (err) {
+        console.warn("[stats] Conversation stats not recorded:", err.message || err);
+    }
+}
 async function generateChatResult(message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed = false, renderedProductIds = []) {
     const { apiKeys, models, products, statuses, systemPrompt: dbSystemPrompt, catalogItemTemplate } = await getConfig();
     const catalog = catalogProducts(products);
@@ -159,13 +197,14 @@ async function generateChatResult(message, extraFields, history, productId, conv
     }
     return { reply: cleanFinalReply, order: savedOrder, product: productData, products: productList };
 }
-async function handleChatSSE(res, message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed = false, renderedProductIds = []) {
+async function handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed = false, renderedProductIds = []) {
     res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
     });
     const result = await generateChatResult(message, extraFields, history, productId, conversationMode, isVoice, productType, orderConfirmed, renderedProductIds);
+    await recordConversationStats(req, conversationMode, result);
     res.write(`data: ${JSON.stringify({ text: result.reply })}\n\n`);
     res.write(`data: ${JSON.stringify({ done: true, ...result })}\n\n`);
     res.write("data: [DONE]\n\n");
@@ -202,10 +241,11 @@ exports.chatRouter.post("/", async (req, res) => {
         };
         const wantsStream = body.stream === true || req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
         if (wantsStream) {
-            await handleChatSSE(res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
+            await handleChatSSE(req, res, message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
             return;
         }
         const result = await generateChatResult(message, extraFields, body.history, body.productId || null, body.conversationMode, false, body.productType, body.orderConfirmed, body.renderedProductIds);
+        await recordConversationStats(req, body.conversationMode, result);
         res.json(result);
     }
     catch (err) {
@@ -248,10 +288,11 @@ exports.chatRouter.post("/voice", upload.single("audio"), async (req, res) => {
         const extraFields = { imageBase64: null, imageMimeType: null, audioBase64, audioMimeType };
         const wantsStream = req.query.stream === "1" || req.headers.accept?.includes("text/event-stream");
         if (wantsStream) {
-            await handleChatSSE(res, message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
+            await handleChatSSE(req, res, message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
             return;
         }
         const result = await generateChatResult(message, extraFields, history, productId, conversationMode, true, productType, false, renderedProductIds);
+        await recordConversationStats(req, conversationMode, result);
         res.json(result);
     }
     catch (err) {
